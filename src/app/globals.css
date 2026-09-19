@@ -1,0 +1,85 @@
+@import "tailwindcss";
+@plugin "daisyui";
+
+@theme {
+  --color-primary: #29479B;
+  --color-secondary: #F0442E;
+  --color-tertiary: #F59E0B;
+  --color-accent: #F59E0B;
+  --color-neutral: #1A284A;
+  --font-sans: var(--font-plus-jakarta-sans), system-ui, -apple-system, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+[data-theme="light"],
+:root {
+  --color-primary: #29479B;
+  --color-primary-content: #ffffff;
+  --color-secondary: #F0442E;
+  --color-secondary-content: #ffffff;
+  --color-accent: #F59E0B;
+  --color-accent-content: #ffffff;
+  --color-neutral: #1A284A;
+  --color-neutral-content: #ffffff;
+  --color-base-100: #ffffff;
+  --color-base-200: #F4F7FC;
+  --color-base-300: #E4EAF5;
+  --color-base-content: #1A284A;
+}
+
+body {
+  font-family: var(--font-plus-jakarta-sans), system-ui, -apple-system, sans-serif;
+  background-color: #F4F7FC;
+  color: #1A284A;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-12px) rotate(2deg); }
+}
+
+@keyframes float-reverse {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(10px) rotate(-2deg); }
+}
+
+@keyframes eye-pupil {
+  0%, 20%, 100% { transform: translate(0, 0); }
+  25%, 45% { transform: translate(-3px, -1px); }
+  55%, 75% { transform: translate(3px, -1px); }
+  85%, 95% { transform: translate(0, 2px); }
+}
+
+@keyframes paper-plane {
+  0%, 100% { transform: translate(0, 0) rotate(-6deg); }
+  50% { transform: translate(16px, -14px) rotate(6deg); }
+}
+
+@keyframes wobble {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-6deg); }
+  75% { transform: rotate(6deg); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: float-reverse 5s ease-in-out infinite;
+}
+
+.animate-eye-pupil {
+  animation: eye-pupil 3s ease-in-out infinite;
+}
+
+.animate-paper-plane {
+  animation: paper-plane 6s ease-in-out infinite;
+}
+
+.animate-wobble {
+  animation: wobble 3s ease-in-out infinite;
+}
