@@ -79,12 +79,12 @@ export function useHomepageSettings() {
   const settingsQuery = useQuery({
     queryKey: ["homepage-setting"],
     queryFn: async () => {
-      // Try /api/settings/homepage first (uses existing next.config.mjs rewrite), fallback to /api/homepage-setting
+      // Resilient fetching: try /api/settings/homepage first, fallback to /api/homepage-setting
       try {
         const { data } = await apiClient.get("/api/settings/homepage");
         return data?.data;
       } catch (err) {
-        if (err.response?.status === 404) {
+        if (err.response?.status === 404 || err.response?.status === 500) {
           const { data } = await apiClient.get("/api/homepage-setting");
           return data?.data;
         }
@@ -100,7 +100,7 @@ export function useHomepageSettings() {
         const { data } = await apiClient.patch("/api/settings/homepage", payload);
         return data?.data;
       } catch (err) {
-        if (err.response?.status === 404) {
+        if (err.response?.status === 404 || err.response?.status === 500) {
           const { data } = await apiClient.patch("/api/homepage-setting", payload);
           return data?.data;
         }

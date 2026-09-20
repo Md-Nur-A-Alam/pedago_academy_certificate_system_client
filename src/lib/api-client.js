@@ -48,9 +48,13 @@ apiClient.interceptors.response.use(
   (error) => {
     const status = error.response?.status;
     const url = error.config?.url;
-    const message = error.response?.data?.message || error.message;
+    const message =
+      error.response?.data?.message ||
+      error.message ||
+      "An unexpected network or server error occurred";
 
     console.error(`[CLIENT API DEBUG Error] ${status || "NETWORK_ERR"} ${url}:`, {
+      status,
       message,
       responseData: error.response?.data,
     });
