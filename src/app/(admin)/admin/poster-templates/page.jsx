@@ -1,5 +1,5 @@
-import { PosterTemplateDesigner } from "@/features/admin/poster-templates/PosterTemplateDesigner";
+import { PosterTemplatesManager } from "@/features/admin/poster-templates/PosterTemplatesManager";
 
 export default function AdminPosterTemplatesPage() {
-  return <PosterTemplateDesigner />;
+  return <PosterTemplatesManager />;
 }

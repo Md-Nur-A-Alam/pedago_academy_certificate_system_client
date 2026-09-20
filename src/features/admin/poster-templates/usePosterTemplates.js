@@ -34,6 +34,23 @@ export function usePosterTemplates(params = {}) {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id) => {
+      console.log("[HOOK DEBUG: PosterTemplates] Deleting poster template:", id);
+      const { data } = await apiClient.delete(`/api/posters/templates/${id}`);
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Poster template deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["poster-templates"] });
+    },
+    onError: (err) => {
+      const msg = err.response?.data?.message || err.message || "Failed to delete poster template";
+      console.error("[HOOK DEBUG: PosterTemplates] Delete error:", msg);
+      toast.error(msg);
+    },
+  });
+
   return {
     templates: templatesQuery.data || [],
     isLoading: templatesQuery.isLoading,
@@ -41,5 +58,8 @@ export function usePosterTemplates(params = {}) {
     error: templatesQuery.error,
     saveTemplate: saveMutation.mutateAsync,
     isSaving: saveMutation.isPending,
+    deleteTemplate: deleteMutation.mutateAsync,
+    isDeleting: deleteMutation.isPending,
+    refetchTemplates: templatesQuery.refetch,
   };
 }
