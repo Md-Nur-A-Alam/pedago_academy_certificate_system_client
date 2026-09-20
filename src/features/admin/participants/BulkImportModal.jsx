@@ -48,13 +48,18 @@ export function BulkImportModal({ isOpen, onClose, competitions = [], onBulkUplo
       "Media URL (Optional)",
     ];
 
+    const definedCats =
+      selectedCompetition?.categories?.length > 0
+        ? selectedCompetition.categories
+        : [selectedCompetition?.category || "General"];
+
     // Prescribed Sample data rows
     const sampleRows = [
       [
         "Alex Rahman",
         "+8801700000001",
         22,
-        "Junior",
+        definedCats[0] || "Junior",
         "https://facebook.com/pedago/posts/10001",
         "https://i.ibb.co/sample1/photo.jpg",
       ],
@@ -62,7 +67,7 @@ export function BulkImportModal({ isOpen, onClose, competitions = [], onBulkUplo
         "Alex Rahman",
         "+8801700000001",
         22,
-        "Senior",
+        definedCats[1] || definedCats[0] || "Senior",
         "https://facebook.com/pedago/posts/10002",
         "",
       ],
@@ -70,7 +75,7 @@ export function BulkImportModal({ isOpen, onClose, competitions = [], onBulkUplo
         "Sarah Khan",
         "+8801800000002",
         19,
-        "Group A",
+        definedCats[2] || definedCats[0] || "Group A",
         "https://facebook.com/pedago/posts/10003",
         "https://i.ibb.co/sample3/avatar.png",
       ],
@@ -353,6 +358,23 @@ export function BulkImportModal({ isOpen, onClose, competitions = [], onBulkUplo
                 onChange={(e) => setSelectedAchievementType(e.target.value)}
               />
             </div>
+
+            {selectedCompetition && (
+              <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-600 bg-slate-50 p-2.5 rounded-xl border border-gray-200/80">
+                <span className="font-bold text-gray-700">Valid Categories for this competition:</span>
+                {(selectedCompetition.categories && selectedCompetition.categories.length > 0
+                  ? selectedCompetition.categories
+                  : [selectedCompetition.category || "General"]
+                ).map((cat, i) => (
+                  <span
+                    key={i}
+                    className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 font-semibold text-[11px]"
+                  >
+                    {cat}
+                  </span>
+                ))}
+              </div>
+            )}
 
             {/* Step 3: Template Download Card */}
             <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">

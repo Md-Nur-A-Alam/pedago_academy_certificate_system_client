@@ -110,6 +110,8 @@ export default function CertificatesPage() {
     size: 44,
     color: "#1A284A",
     align: "center",
+    rotation: 0,
+    enabled: true,
   };
 
   const refZone = certTemplate?.refZone || {
@@ -119,6 +121,29 @@ export default function CertificatesPage() {
     size: 16,
     color: "#29479B",
     align: "center",
+    rotation: 0,
+    enabled: true,
+  };
+
+  const dateZone = certTemplate?.dateZone || {
+    x: 25,
+    y: 85,
+    font: "Montserrat",
+    size: 16,
+    color: "#1A284A",
+    align: "center",
+    rotation: 0,
+    format: "20 September 2026",
+    enabled: false,
+  };
+
+  const signatureZone = certTemplate?.signatureZone || {
+    imageUrl: "",
+    x: 75,
+    y: 85,
+    width: 16,
+    rotation: 0,
+    enabled: false,
   };
 
   const scaleFont = (sizePt) => {
@@ -127,10 +152,11 @@ export default function CertificatesPage() {
     return Math.max(10, Math.round(base * factor * 1.3));
   };
 
-  const getTransform = (align = "center") => {
-    if (align === "left") return "translate(0%, -50%)";
-    if (align === "right") return "translate(-100%, -50%)";
-    return "translate(-50%, -50%)";
+  const getTransform = (align = "center", rotation = 0) => {
+    let translate = "translate(-50%, -50%)";
+    if (align === "left") translate = "translate(0%, -50%)";
+    if (align === "right") translate = "translate(-100%, -50%)";
+    return `${translate} rotate(${rotation || 0}deg)`;
   };
 
   // Helper to generate & download a certificate given participant and template
@@ -145,74 +171,157 @@ export default function CertificatesPage() {
       bgImg.crossOrigin = "anonymous";
       bgImg.src = template.backgroundImageUrl;
 
-      bgImg.onload = () => {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        canvas.width = bgImg.naturalWidth || 1920;
-        canvas.height = bgImg.naturalHeight || 1080;
+      const nZ = template.nameZone || nameZone;
+      const rZ = template.refZone || refZone;
+      const dZ = template.dateZone || dateZone;
+      const sZ = template.signatureZone || signatureZone;
 
-        // Draw background artwork
-        ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+      const isNameEnabled = nZ.enabled !== false;
+      const isRefEnabled = rZ.enabled !== false;
+      const isDateEnabled = Boolean(dZ.enabled);
+      const isSigEnabled = Boolean(sZ.enabled && sZ.imageUrl);
 
-        const nZ = template.nameZone || nameZone;
-        const rZ = template.refZone || refZone;
+      const loadPromises = [
+        new Promise((res, rej) => {
+          bgImg.onload = () => res(bgImg);
+          bgImg.onerror = rej;
+        }),
+      ];
 
-        // Draw Recipient Name
-        if (participant?.name) {
-          const nameSizePx = (nZ.size || 44) * (canvas.width / 1000) * 1.3;
-          ctx.font = buildCanvasFont({
-            font: nZ.font || "Great Vibes",
-            size: nameSizePx,
-            style: nZ.style || "normal",
-          });
-          ctx.fillStyle = nZ.color || "#1A284A";
-          ctx.textAlign = nZ.align || "center";
-          ctx.textBaseline = "middle";
-
-          const nameX = (nZ.x / 100) * canvas.width;
-          const nameY = (nZ.y / 100) * canvas.height;
-          ctx.fillText(participant.name, nameX, nameY);
-        }
-
-        // Draw Reference Code
-        if (participant?.refNumber) {
-          const refSizePx = (rZ.size || 16) * (canvas.width / 1000) * 1.3;
-          ctx.font = buildCanvasFont({
-            font: rZ.font || "Montserrat",
-            size: refSizePx,
-            style: rZ.style || "bold",
-          });
-          ctx.fillStyle = rZ.color || "#29479B";
-          ctx.textAlign = rZ.align || "center";
-          ctx.textBaseline = "middle";
-
-          const refX = (rZ.x / 100) * canvas.width;
-          const refY = (rZ.y / 100) * canvas.height;
-          ctx.fillText(participant.refNumber, refX, refY);
-        }
-
-        // Record download count on server
-        apiClient
-          .post("/api/participants/record-download", {
-            refNumber: participant.refNumber,
-            type: "certificate",
+      let sigImg = null;
+      if (isSigEnabled) {
+        sigImg = new Image();
+        sigImg.crossOrigin = "anonymous";
+        sigImg.src = sZ.imageUrl;
+        loadPromises.push(
+          new Promise((res) => {
+            sigImg.onload = () => res(sigImg);
+            sigImg.onerror = () => res(null);
           })
-          .catch(() => {});
+        );
+      }
 
-        // Save file to user
-        const safeName = (participant.name || "Participant").replace(/[^a-z0-9]/gi, "_");
-        const safeCat = (participant.category || "General").replace(/[^a-z0-9]/gi, "_");
-        const link = document.createElement("a");
-        link.download = `${safeName}_${safeCat}_Official_Certificate.png`;
-        link.href = canvas.toDataURL("image/png");
-        link.click();
-        resolve(true);
-      };
+      Promise.all(loadPromises)
+        .then(() => {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          canvas.width = bgImg.naturalWidth || 1920;
+          canvas.height = bgImg.naturalHeight || 1080;
 
-      bgImg.onerror = (err) => {
-        toast.error("Failed to load certificate background image");
-        reject(err);
-      };
+          // Draw background artwork
+          ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+
+          // Draw Recipient Name (if enabled)
+          if (isNameEnabled && participant?.name) {
+            const nameSizePx = (nZ.size || 44) * (canvas.width / 1000) * 1.3;
+            const fontStr = buildCanvasFont({
+              font: nZ.font || "Great Vibes",
+              size: nameSizePx,
+              style: nZ.style || "normal",
+            });
+            const nameX = (nZ.x / 100) * canvas.width;
+            const nameY = (nZ.y / 100) * canvas.height;
+
+            ctx.save();
+            ctx.translate(nameX, nameY);
+            if (nZ.rotation) {
+              ctx.rotate((nZ.rotation * Math.PI) / 180);
+            }
+            ctx.font = fontStr;
+            ctx.fillStyle = nZ.color || "#1A284A";
+            ctx.textAlign = nZ.align || "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(participant.name, 0, 0);
+            ctx.restore();
+          }
+
+          // Draw Reference Code (if enabled)
+          if (isRefEnabled && participant?.refNumber) {
+            const refSizePx = (rZ.size || 16) * (canvas.width / 1000) * 1.3;
+            const fontStr = buildCanvasFont({
+              font: rZ.font || "Montserrat",
+              size: refSizePx,
+              style: rZ.style || "bold",
+            });
+            const refX = (rZ.x / 100) * canvas.width;
+            const refY = (rZ.y / 100) * canvas.height;
+
+            ctx.save();
+            ctx.translate(refX, refY);
+            if (rZ.rotation) {
+              ctx.rotate((rZ.rotation * Math.PI) / 180);
+            }
+            ctx.font = fontStr;
+            ctx.fillStyle = rZ.color || "#29479B";
+            ctx.textAlign = rZ.align || "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(participant.refNumber, 0, 0);
+            ctx.restore();
+          }
+
+          // Draw Date Field (if enabled)
+          if (isDateEnabled) {
+            const dateText = dZ.format || "20 September 2026";
+            const dateSizePx = (dZ.size || 16) * (canvas.width / 1000) * 1.3;
+            const fontStr = buildCanvasFont({
+              font: dZ.font || "Montserrat",
+              size: dateSizePx,
+              style: dZ.style || "normal",
+            });
+            const dateX = (dZ.x / 100) * canvas.width;
+            const dateY = (dZ.y / 100) * canvas.height;
+
+            ctx.save();
+            ctx.translate(dateX, dateY);
+            if (dZ.rotation) {
+              ctx.rotate((dZ.rotation * Math.PI) / 180);
+            }
+            ctx.font = fontStr;
+            ctx.fillStyle = dZ.color || "#1A284A";
+            ctx.textAlign = dZ.align || "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(dateText, 0, 0);
+            ctx.restore();
+          }
+
+          // Draw Signature PNG (if enabled)
+          if (isSigEnabled && sigImg && sigImg.complete && sigImg.naturalWidth) {
+            const sigWidth = ((sZ.width || 16) / 100) * canvas.width;
+            const aspect = sigImg.naturalHeight / sigImg.naturalWidth;
+            const sigHeight = sigWidth * aspect;
+            const sigX = (sZ.x / 100) * canvas.width;
+            const sigY = (sZ.y / 100) * canvas.height;
+
+            ctx.save();
+            ctx.translate(sigX, sigY);
+            if (sZ.rotation) {
+              ctx.rotate((sZ.rotation * Math.PI) / 180);
+            }
+            ctx.drawImage(sigImg, -sigWidth / 2, -sigHeight / 2, sigWidth, sigHeight);
+            ctx.restore();
+          }
+
+          // Record download count on server
+          apiClient
+            .post("/api/participants/record-download", {
+              refNumber: participant.refNumber,
+              type: "certificate",
+            })
+            .catch(() => {});
+
+          // Save file to user
+          const safeName = (participant.name || "Participant").replace(/[^a-z0-9]/gi, "_");
+          const safeCat = (participant.category || "General").replace(/[^a-z0-9]/gi, "_");
+          const link = document.createElement("a");
+          link.download = `${safeName}_${safeCat}_Official_Certificate.png`;
+          link.href = canvas.toDataURL("image/png");
+          link.click();
+          resolve(true);
+        })
+        .catch((err) => {
+          toast.error("Failed to load certificate background image");
+          reject(err);
+        });
     });
   };
 
@@ -527,7 +636,7 @@ export default function CertificatesPage() {
                   )}
 
                   {/* Rendered Name */}
-                  {(() => {
+                  {nameZone.enabled !== false && (() => {
                     const { isBold, isItalic } = parseStyleBooleans(nameZone.style);
                     return (
                       <div
@@ -535,7 +644,7 @@ export default function CertificatesPage() {
                         style={{
                           left: `${nameZone.x}%`,
                           top: `${nameZone.y}%`,
-                          transform: getTransform(nameZone.align),
+                          transform: getTransform(nameZone.align, nameZone.rotation),
                           fontFamily: nameZone.font || "Great Vibes",
                           fontSize: `${scaleFont(nameZone.size)}px`,
                           fontWeight: isBold ? "bold" : "normal",
@@ -553,7 +662,7 @@ export default function CertificatesPage() {
                   })()}
 
                   {/* Rendered Reference Code */}
-                  {(() => {
+                  {refZone.enabled !== false && (() => {
                     const { isBold, isItalic } = parseStyleBooleans(refZone.style);
                     return (
                       <div
@@ -561,7 +670,7 @@ export default function CertificatesPage() {
                         style={{
                           left: `${refZone.x}%`,
                           top: `${refZone.y}%`,
-                          transform: getTransform(refZone.align),
+                          transform: getTransform(refZone.align, refZone.rotation),
                           fontFamily: refZone.font || "Montserrat",
                           fontSize: `${scaleFont(refZone.size)}px`,
                           fontWeight: isBold ? "bold" : "normal",
@@ -577,6 +686,53 @@ export default function CertificatesPage() {
                       </div>
                     );
                   })()}
+
+                  {/* Rendered Date Field */}
+                  {Boolean(dateZone.enabled) && (() => {
+                    const { isBold, isItalic } = parseStyleBooleans(dateZone.style);
+                    return (
+                      <div
+                        className="absolute select-none pointer-events-none"
+                        style={{
+                          left: `${dateZone.x}%`,
+                          top: `${dateZone.y}%`,
+                          transform: getTransform(dateZone.align, dateZone.rotation),
+                          fontFamily: dateZone.font || "Montserrat",
+                          fontSize: `${scaleFont(dateZone.size)}px`,
+                          fontWeight: isBold ? "bold" : "normal",
+                          fontStyle: isItalic ? "italic" : "normal",
+                          color: dateZone.color || "#1A284A",
+                          textAlign: dateZone.align || "center",
+                          whiteSpace: "nowrap",
+                          lineHeight: 1.2,
+                          zIndex: 25,
+                        }}
+                      >
+                        {dateZone.format || "20 September 2026"}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Rendered Signature PNG */}
+                  {Boolean(signatureZone.enabled && signatureZone.imageUrl) && (
+                    <div
+                      className="absolute select-none pointer-events-none"
+                      style={{
+                        left: `${signatureZone.x}%`,
+                        top: `${signatureZone.y}%`,
+                        width: `${signatureZone.width || 16}%`,
+                        transform: `translate(-50%, -50%) rotate(${signatureZone.rotation || 0}deg)`,
+                        zIndex: 25,
+                      }}
+                    >
+                      <img
+                        src={signatureZone.imageUrl}
+                        alt="Signature"
+                        className="w-full h-auto block select-none pointer-events-none drop-shadow-xs"
+                        crossOrigin="anonymous"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Download Actions */}

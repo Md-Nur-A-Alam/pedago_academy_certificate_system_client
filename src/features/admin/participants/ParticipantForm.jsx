@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -46,16 +46,54 @@ export function ParticipantForm({ initialData, onSubmit, onClose, isLoading }) {
     },
   });
 
+  const selectedCompetitionId = watch("competitionId");
+  const selectedCategory = watch("category");
   const mediaUrl = watch("mediaUrl");
+
+  // Determine current competition and its defined categories
+  const selectedCompetition = useMemo(() => {
+    return competitions.find((c) => c._id === selectedCompetitionId);
+  }, [competitions, selectedCompetitionId]);
+
+  const categoryOptions = useMemo(() => {
+    if (!selectedCompetition) {
+      return [{ label: "-- Select Competition First --", value: "" }];
+    }
+
+    const cats =
+      Array.isArray(selectedCompetition.categories) && selectedCompetition.categories.length > 0
+        ? selectedCompetition.categories
+        : [selectedCompetition.category || "General"];
+
+    return cats.map((cat) => ({ label: cat, value: cat }));
+  }, [selectedCompetition]);
+
+  // When competition changes, ensure category is set to a valid option of that competition
+  useEffect(() => {
+    if (selectedCompetition && categoryOptions.length > 0) {
+      const validValues = categoryOptions.map((o) => o.value);
+      if (!validValues.includes(selectedCategory)) {
+        setValue("category", validValues[0], { shouldValidate: true });
+      }
+    }
+  }, [selectedCompetition, categoryOptions, selectedCategory, setValue]);
+
+  // Set initial competition if available and none selected yet
+  useEffect(() => {
+    if (!initialData && competitions.length > 0 && !selectedCompetitionId) {
+      setValue("competitionId", competitions[0]._id);
+    }
+  }, [competitions, selectedCompetitionId, initialData, setValue]);
 
   useEffect(() => {
     if (initialData) {
+      const compId = initialData.competitionId?._id || initialData.competitionId || "";
       reset({
         name: initialData.name || "",
         phone: initialData.phone || "",
         age: initialData.age ?? "",
         category: initialData.category || "General",
-        competitionId: initialData.competitionId?._id || initialData.competitionId || "",
+        competitionId: compId,
         achievementType: initialData.achievementType || "participant",
         sourceUrl: initialData.sourceUrl || "",
         mediaUrl: initialData.mediaUrl || "",
@@ -75,6 +113,29 @@ export function ParticipantForm({ initialData, onSubmit, onClose, isLoading }) {
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
+      {/* Target Competition Selector */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Select
+          label="Competition (প্রতিযোগিতা) *"
+          options={competitionOptions.length > 0 ? competitionOptions : [{ label: "No competitions available", value: "" }]}
+          error={errors.competitionId?.message}
+          {...register("competitionId")}
+        />
+
+        {/* Dynamic Mandatory Category Dropdown */}
+        <Select
+          label="Category (ক্যাটাগরি) *"
+          options={categoryOptions}
+          error={errors.category?.message}
+          helperText={
+            selectedCompetition
+              ? `Select from ${categoryOptions.length} categories defined for this competition`
+              : "Please select a competition first"
+          }
+          {...register("category")}
+        />
+      </div>
+
       <Input
         label="Participant Name *"
         placeholder="e.g. Alex Rahman"
@@ -100,28 +161,11 @@ export function ParticipantForm({ initialData, onSubmit, onClose, isLoading }) {
           {...register("age")}
         />
 
-        <Input
-          label="Category *"
-          placeholder="e.g. Junior, Senior, Group A"
-          helperText="Mandatory participant category"
-          error={errors.category?.message}
-          {...register("category")}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Select
-          label="Competition *"
-          options={competitionOptions.length > 0 ? competitionOptions : [{ label: "No competitions", value: "" }]}
-          error={errors.competitionId?.message}
-          {...register("competitionId")}
-        />
-
         <Select
           label="Achievement Type *"
           options={[
-            { label: "Participant", value: "participant" },
-            { label: "Winner", value: "winner" },
+            { label: "Participant (অংশগ্রহণকারী)", value: "participant" },
+            { label: "Winner (বিজয়ী)", value: "winner" },
           ]}
           error={errors.achievementType?.message}
           {...register("achievementType")}
@@ -141,7 +185,7 @@ export function ParticipantForm({ initialData, onSubmit, onClose, isLoading }) {
           Media Link or Upload (Optional)
         </label>
         <p className="text-xs text-gray-500 mb-2">
-          Upload participant's photo or media file (auto-hosted on ImgBB), or paste an external URL directly.
+          Upload participant&apos;s photo or media file (auto-hosted on ImgBB), or paste an external URL directly.
         </p>
         <ImageUpload
           value={mediaUrl}

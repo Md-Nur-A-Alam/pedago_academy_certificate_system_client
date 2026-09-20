@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Download, X, Eye, Sparkles, User, Award, CheckCircle2, Sliders } from "lucide-react";
+import { Download, X, Eye, Sparkles, User, Award, CheckCircle2, Sliders, Calendar, PenTool } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -18,14 +18,16 @@ export function CertificateTestPreviewModal({ isOpen, onClose, template }) {
 
   const [testName, setTestName] = useState("");
   const [testRef, setTestRef] = useState("");
+  const [testDate, setTestDate] = useState("");
   const [containerWidth, setContainerWidth] = useState(800);
   const containerRef = useRef(null);
 
   // Set default test values from admin data
   useEffect(() => {
     if (isOpen && template) {
-      setTestName(admin?.name || "Test admin");
+      setTestName(admin?.name || "Alex Rahman");
       setTestRef(`${refPrefix}-001`);
+      setTestDate(template?.dateZone?.format || "20 September 2026");
     }
   }, [isOpen, template, admin, refPrefix]);
 
@@ -45,7 +47,20 @@ export function CertificateTestPreviewModal({ isOpen, onClose, template }) {
 
   if (!template) return null;
 
-  const { backgroundImageUrl, nameZone = {}, refZone = {}, variant, version = 1 } = template;
+  const {
+    backgroundImageUrl,
+    nameZone = {},
+    refZone = {},
+    dateZone = {},
+    signatureZone = {},
+    variant,
+    version = 1,
+  } = template;
+
+  const isNameEnabled = nameZone.enabled !== false;
+  const isRefEnabled = refZone.enabled !== false;
+  const isDateEnabled = Boolean(dateZone.enabled);
+  const isSigEnabled = Boolean(signatureZone.enabled);
 
   const scaleFont = (sizePt) => {
     const base = Number(sizePt) || 24;
@@ -53,59 +68,135 @@ export function CertificateTestPreviewModal({ isOpen, onClose, template }) {
     return Math.max(10, Math.round(base * factor * 1.3));
   };
 
-  const getTransform = (align = "center") => {
-    if (align === "left") return "translate(0%, -50%)";
-    if (align === "right") return "translate(-100%, -50%)";
-    return "translate(-50%, -50%)";
+  const getTransform = (align = "center", rotation = 0) => {
+    let translate = "translate(-50%, -50%)";
+    if (align === "left") translate = "translate(0%, -50%)";
+    if (align === "right") translate = "translate(-100%, -50%)";
+    return `${translate} rotate(${rotation || 0}deg)`;
   };
 
   // Generate and download test PNG certificate using HTML5 Canvas
   const handleDownloadSample = () => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = backgroundImageUrl;
+    const bgImg = new Image();
+    bgImg.crossOrigin = "anonymous";
+    bgImg.src = backgroundImageUrl;
 
-    img.onload = () => {
+    const loadImages = [
+      new Promise((res, rej) => {
+        bgImg.onload = () => res(bgImg);
+        bgImg.onerror = rej;
+      }),
+    ];
+
+    let sigImg = null;
+    if (isSigEnabled && signatureZone.imageUrl) {
+      sigImg = new Image();
+      sigImg.crossOrigin = "anonymous";
+      sigImg.src = signatureZone.imageUrl;
+      loadImages.push(
+        new Promise((res) => {
+          sigImg.onload = () => res(sigImg);
+          sigImg.onerror = () => res(null); // gracefully continue if signature fails
+        })
+      );
+    }
+
+    Promise.all(loadImages).then(() => {
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
-      canvas.width = img.naturalWidth || 1920;
-      canvas.height = img.naturalHeight || 1080;
+      canvas.width = bgImg.naturalWidth || 1920;
+      canvas.height = bgImg.naturalHeight || 1080;
 
       // Draw background
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
 
       // Render Name
-      if (testName) {
+      if (isNameEnabled && testName) {
         const nameSizePx = (nameZone.size || 42) * (canvas.width / 1000) * 1.3;
-        ctx.font = buildCanvasFont({
+        const fontStr = buildCanvasFont({
           font: nameZone.font || "Great Vibes",
           size: nameSizePx,
           style: nameZone.style || "normal",
         });
+        const nameX = (nameZone.x / 100) * canvas.width;
+        const nameY = (nameZone.y / 100) * canvas.height;
+
+        ctx.save();
+        ctx.translate(nameX, nameY);
+        if (nameZone.rotation) {
+          ctx.rotate((nameZone.rotation * Math.PI) / 180);
+        }
+        ctx.font = fontStr;
         ctx.fillStyle = nameZone.color || "#1A284A";
         ctx.textAlign = nameZone.align || "center";
         ctx.textBaseline = "middle";
-
-        const nameX = (nameZone.x / 100) * canvas.width;
-        const nameY = (nameZone.y / 100) * canvas.height;
-        ctx.fillText(testName, nameX, nameY);
+        ctx.fillText(testName, 0, 0);
+        ctx.restore();
       }
 
       // Render Ref Code
-      if (testRef) {
+      if (isRefEnabled && testRef) {
         const refSizePx = (refZone.size || 18) * (canvas.width / 1000) * 1.3;
-        ctx.font = buildCanvasFont({
+        const fontStr = buildCanvasFont({
           font: refZone.font || "Montserrat",
           size: refSizePx,
           style: refZone.style || "normal",
         });
+        const refX = (refZone.x / 100) * canvas.width;
+        const refY = (refZone.y / 100) * canvas.height;
+
+        ctx.save();
+        ctx.translate(refX, refY);
+        if (refZone.rotation) {
+          ctx.rotate((refZone.rotation * Math.PI) / 180);
+        }
+        ctx.font = fontStr;
         ctx.fillStyle = refZone.color || "#29479B";
         ctx.textAlign = refZone.align || "center";
         ctx.textBaseline = "middle";
+        ctx.fillText(testRef, 0, 0);
+        ctx.restore();
+      }
 
-        const refX = (refZone.x / 100) * canvas.width;
-        const refY = (refZone.y / 100) * canvas.height;
-        ctx.fillText(testRef, refX, refY);
+      // Render Date Field
+      if (isDateEnabled && testDate) {
+        const dateSizePx = (dateZone.size || 16) * (canvas.width / 1000) * 1.3;
+        const fontStr = buildCanvasFont({
+          font: dateZone.font || "Montserrat",
+          size: dateSizePx,
+          style: dateZone.style || "normal",
+        });
+        const dateX = (dateZone.x / 100) * canvas.width;
+        const dateY = (dateZone.y / 100) * canvas.height;
+
+        ctx.save();
+        ctx.translate(dateX, dateY);
+        if (dateZone.rotation) {
+          ctx.rotate((dateZone.rotation * Math.PI) / 180);
+        }
+        ctx.font = fontStr;
+        ctx.fillStyle = dateZone.color || "#1A284A";
+        ctx.textAlign = dateZone.align || "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(testDate, 0, 0);
+        ctx.restore();
+      }
+
+      // Render Signature PNG
+      if (isSigEnabled && sigImg && sigImg.complete && sigImg.naturalWidth) {
+        const sigWidth = ((signatureZone.width || 16) / 100) * canvas.width;
+        const aspect = sigImg.naturalHeight / sigImg.naturalWidth;
+        const sigHeight = sigWidth * aspect;
+        const sigX = (signatureZone.x / 100) * canvas.width;
+        const sigY = (signatureZone.y / 100) * canvas.height;
+
+        ctx.save();
+        ctx.translate(sigX, sigY);
+        if (signatureZone.rotation) {
+          ctx.rotate((signatureZone.rotation * Math.PI) / 180);
+        }
+        ctx.drawImage(sigImg, -sigWidth / 2, -sigHeight / 2, sigWidth, sigHeight);
+        ctx.restore();
       }
 
       // Trigger download
@@ -114,7 +205,7 @@ export function CertificateTestPreviewModal({ isOpen, onClose, template }) {
       link.download = `Test_Certificate_${refPrefix}_${variant}.png`;
       link.href = dataUrl;
       link.click();
-    };
+    });
   };
 
   return (
@@ -142,21 +233,32 @@ export function CertificateTestPreviewModal({ isOpen, onClose, template }) {
         </div>
 
         {/* Test Inputs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-blue-50/40 p-4 rounded-xl border border-blue-100">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-blue-50/40 p-4 rounded-xl border border-blue-100">
           <Input
-            label="Test Recipient Name (Admin Data)"
-            placeholder="e.g. Test admin"
+            label="Test Recipient Name"
+            placeholder="e.g. Alex Rahman"
             value={testName}
             onChange={(e) => setTestName(e.target.value)}
-            helperText="Pre-filled with your admin profile name"
+            disabled={!isNameEnabled}
+            helperText={isNameEnabled ? "Pre-filled with test name" : "Field disabled in template"}
           />
 
           <Input
-            label="Test Reference Number"
+            label="Test Reference Code"
             placeholder="e.g. NB-001"
             value={testRef}
             onChange={(e) => setTestRef(e.target.value)}
-            helperText="Pre-filled with competition demo reference code"
+            disabled={!isRefEnabled}
+            helperText={isRefEnabled ? "Pre-filled with reference code" : "Field disabled in template"}
+          />
+
+          <Input
+            label="Test Date"
+            placeholder="e.g. 20 September 2026"
+            value={testDate}
+            onChange={(e) => setTestDate(e.target.value)}
+            disabled={!isDateEnabled}
+            helperText={isDateEnabled ? "Pre-filled with issue date" : "Field disabled in template"}
           />
         </div>
 
@@ -182,77 +284,121 @@ export function CertificateTestPreviewModal({ isOpen, onClose, template }) {
             />
 
             {/* Rendered Name */}
-            {(() => {
-              const { isBold, isItalic } = parseStyleBooleans(nameZone.style);
-              return (
-                <div
-                  className="absolute select-none pointer-events-none"
-                  style={{
-                    left: `${nameZone.x}%`,
-                    top: `${nameZone.y}%`,
-                    transform: getTransform(nameZone.align),
-                    fontFamily: nameZone.font || "Great Vibes",
-                    fontSize: `${scaleFont(nameZone.size)}px`,
-                    fontWeight: isBold ? "bold" : "normal",
-                    fontStyle: isItalic ? "italic" : "normal",
-                    color: nameZone.color || "#1A284A",
-                    textAlign: nameZone.align || "center",
-                    whiteSpace: "nowrap",
-                    lineHeight: 1.2,
-                    zIndex: 20,
-                  }}
-                >
-                  {testName}
-                </div>
-              );
-            })()}
+            {isNameEnabled && (
+              <div
+                className="absolute select-none pointer-events-none"
+                style={{
+                  left: `${nameZone.x}%`,
+                  top: `${nameZone.y}%`,
+                  transform: getTransform(nameZone.align, nameZone.rotation),
+                  fontFamily: nameZone.font || "Great Vibes",
+                  fontSize: `${scaleFont(nameZone.size)}px`,
+                  fontWeight: parseStyleBooleans(nameZone.style).isBold ? "bold" : "normal",
+                  fontStyle: parseStyleBooleans(nameZone.style).isItalic ? "italic" : "normal",
+                  color: nameZone.color || "#1A284A",
+                  textAlign: nameZone.align || "center",
+                  whiteSpace: "nowrap",
+                  lineHeight: 1.2,
+                  zIndex: 20,
+                }}
+              >
+                {testName}
+              </div>
+            )}
 
             {/* Rendered Ref */}
-            {(() => {
-              const { isBold, isItalic } = parseStyleBooleans(refZone.style);
-              return (
-                <div
-                  className="absolute select-none pointer-events-none"
-                  style={{
-                    left: `${refZone.x}%`,
-                    top: `${refZone.y}%`,
-                    transform: getTransform(refZone.align),
-                    fontFamily: refZone.font || "Montserrat",
-                    fontSize: `${scaleFont(refZone.size)}px`,
-                    fontWeight: isBold ? "bold" : "normal",
-                    fontStyle: isItalic ? "italic" : "normal",
-                    color: refZone.color || "#29479B",
-                    textAlign: refZone.align || "center",
-                    whiteSpace: "nowrap",
-                    lineHeight: 1.2,
-                    zIndex: 20,
-                  }}
-                >
-                  {testRef}
-                </div>
-              );
-            })()}
+            {isRefEnabled && (
+              <div
+                className="absolute select-none pointer-events-none"
+                style={{
+                  left: `${refZone.x}%`,
+                  top: `${refZone.y}%`,
+                  transform: getTransform(refZone.align, refZone.rotation),
+                  fontFamily: refZone.font || "Montserrat",
+                  fontSize: `${scaleFont(refZone.size)}px`,
+                  fontWeight: parseStyleBooleans(refZone.style).isBold ? "bold" : "normal",
+                  fontStyle: parseStyleBooleans(refZone.style).isItalic ? "italic" : "normal",
+                  color: refZone.color || "#29479B",
+                  textAlign: refZone.align || "center",
+                  whiteSpace: "nowrap",
+                  lineHeight: 1.2,
+                  zIndex: 20,
+                }}
+              >
+                {testRef}
+              </div>
+            )}
+
+            {/* Rendered Date */}
+            {isDateEnabled && (
+              <div
+                className="absolute select-none pointer-events-none"
+                style={{
+                  left: `${dateZone.x}%`,
+                  top: `${dateZone.y}%`,
+                  transform: getTransform(dateZone.align, dateZone.rotation),
+                  fontFamily: dateZone.font || "Montserrat",
+                  fontSize: `${scaleFont(dateZone.size)}px`,
+                  fontWeight: parseStyleBooleans(dateZone.style).isBold ? "bold" : "normal",
+                  fontStyle: parseStyleBooleans(dateZone.style).isItalic ? "italic" : "normal",
+                  color: dateZone.color || "#1A284A",
+                  textAlign: dateZone.align || "center",
+                  whiteSpace: "nowrap",
+                  lineHeight: 1.2,
+                  zIndex: 20,
+                }}
+              >
+                {testDate}
+              </div>
+            )}
+
+            {/* Rendered Signature PNG */}
+            {isSigEnabled && signatureZone.imageUrl && (
+              <div
+                className="absolute select-none pointer-events-none"
+                style={{
+                  left: `${signatureZone.x}%`,
+                  top: `${signatureZone.y}%`,
+                  width: `${signatureZone.width || 16}%`,
+                  transform: `translate(-50%, -50%) rotate(${signatureZone.rotation || 0}deg)`,
+                  zIndex: 20,
+                }}
+              >
+                <img
+                  src={signatureZone.imageUrl}
+                  alt="Signature"
+                  className="w-full h-auto block select-none pointer-events-none drop-shadow-xs"
+                  crossOrigin="anonymous"
+                />
+              </div>
+            )}
           </div>
         </div>
 
         {/* Template Positioning Specs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-gray-50 p-3.5 rounded-xl border border-gray-100">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs bg-gray-50 p-3.5 rounded-xl border border-gray-100">
           <div>
-            <span className="font-bold text-gray-700 block mb-1">👤 Name Placement:</span>
+            <span className="font-bold text-gray-700 block mb-1">👤 Name:</span>
             <span className="text-gray-500">
-              X: <strong className="text-gray-700">{nameZone.x}%</strong>, Y:{" "}
-              <strong className="text-gray-700">{nameZone.y}%</strong> | Font:{" "}
-              <strong className="text-gray-700">{nameZone.font}</strong> ({nameZone.size}pt, {nameZone.style || "normal"}) | Color:{" "}
-              <strong style={{ color: nameZone.color }}>{nameZone.color}</strong>
+              {isNameEnabled ? `${nameZone.x}%, ${nameZone.y}% (Rot: ${nameZone.rotation || 0}°)` : "Disabled"}
             </span>
           </div>
           <div>
-            <span className="font-bold text-gray-700 block mb-1">🏷️ Reference Code Placement:</span>
+            <span className="font-bold text-gray-700 block mb-1">🏷️ Ref ID:</span>
             <span className="text-gray-500">
-              X: <strong className="text-gray-700">{refZone.x}%</strong>, Y:{" "}
-              <strong className="text-gray-700">{refZone.y}%</strong> | Font:{" "}
-              <strong className="text-gray-700">{refZone.font}</strong> ({refZone.size}pt, {refZone.style || "normal"}) | Color:{" "}
-              <strong style={{ color: refZone.color }}>{refZone.color}</strong>
+              {isRefEnabled ? `${refZone.x}%, ${refZone.y}% (Rot: ${refZone.rotation || 0}°)` : "Disabled"}
+            </span>
+          </div>
+          <div>
+            <span className="font-bold text-gray-700 block mb-1">📅 Date:</span>
+            <span className="text-gray-500">
+              {isDateEnabled ? `${dateZone.x}%, ${dateZone.y}% (Rot: ${dateZone.rotation || 0}°)` : "Disabled"}
+            </span>
+          </div>
+          <div>
+            <span className="font-bold text-gray-700 block mb-1">✍️ Signature:</span>
+            <span className="text-gray-500">
+              {isSigEnabled ? `${signatureZone.x}%, ${signatureZone.y}% (Width: ${signatureZone.width || 16}%, Rot: ${signatureZone.rotation || 0}°)` : "Disabled"}
             </span>
           </div>
         </div>

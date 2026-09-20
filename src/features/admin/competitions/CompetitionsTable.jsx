@@ -129,9 +129,19 @@ export function CompetitionsTable() {
                   <tr key={comp._id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-6 py-4 font-semibold text-[#1A284A]">{comp.name}</td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-100">
-                        {comp.category || "General"}
-                      </span>
+                      <div className="flex flex-wrap gap-1 max-w-[220px]">
+                        {(comp.categories && comp.categories.length > 0
+                          ? comp.categories
+                          : [comp.category || "General"]
+                        ).map((cat, i) => (
+                          <span
+                            key={i}
+                            className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-100"
+                          >
+                            {cat}
+                          </span>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-6 py-4 font-mono text-xs text-[#29479B] font-bold">
                       {comp.refPrefix}
