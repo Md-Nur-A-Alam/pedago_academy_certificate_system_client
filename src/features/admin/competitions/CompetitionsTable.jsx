@@ -117,6 +117,7 @@ export function CompetitionsTable() {
               <thead className="bg-gray-50/70 text-gray-700 uppercase font-semibold text-xs border-b border-gray-100">
                 <tr>
                   <th className="px-6 py-4">Competition Name</th>
+                  <th className="px-6 py-4">Category</th>
                   <th className="px-6 py-4">Ref Prefix</th>
                   <th className="px-6 py-4">Padding</th>
                   <th className="px-6 py-4">Status</th>
@@ -127,6 +128,11 @@ export function CompetitionsTable() {
                 {competitions.map((comp) => (
                   <tr key={comp._id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-6 py-4 font-semibold text-[#1A284A]">{comp.name}</td>
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-100">
+                        {comp.category || "General"}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 font-mono text-xs text-[#29479B] font-bold">
                       {comp.refPrefix}
                     </td>

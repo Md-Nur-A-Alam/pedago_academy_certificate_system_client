@@ -14,6 +14,7 @@ const participantFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
   phone: z.string().min(1, "Phone is required"),
   age: z.coerce.number({ invalid_type_error: "Age is required" }).min(1, "Age must be at least 1").max(120, "Age must be valid"),
+  category: z.string().min(1, "Category is required"),
   competitionId: z.string().min(1, "Competition is required"),
   achievementType: z.enum(["participant", "winner"]).default("participant"),
   sourceUrl: z.string().min(1, "Source URL is required"),
@@ -37,6 +38,7 @@ export function ParticipantForm({ initialData, onSubmit, onClose, isLoading }) {
       name: "",
       phone: "",
       age: "",
+      category: "General",
       competitionId: "",
       achievementType: "participant",
       sourceUrl: "",
@@ -52,6 +54,7 @@ export function ParticipantForm({ initialData, onSubmit, onClose, isLoading }) {
         name: initialData.name || "",
         phone: initialData.phone || "",
         age: initialData.age ?? "",
+        category: initialData.category || "General",
         competitionId: initialData.competitionId?._id || initialData.competitionId || "",
         achievementType: initialData.achievementType || "participant",
         sourceUrl: initialData.sourceUrl || "",
@@ -79,7 +82,7 @@ export function ParticipantForm({ initialData, onSubmit, onClose, isLoading }) {
         {...register("name")}
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Input
           label="Phone Number *"
           placeholder="e.g. +8801700000000"
@@ -95,6 +98,14 @@ export function ParticipantForm({ initialData, onSubmit, onClose, isLoading }) {
           placeholder="e.g. 21"
           error={errors.age?.message}
           {...register("age")}
+        />
+
+        <Input
+          label="Category *"
+          placeholder="e.g. Junior, Senior, Group A"
+          helperText="Mandatory participant category"
+          error={errors.category?.message}
+          {...register("category")}
         />
       </div>
 

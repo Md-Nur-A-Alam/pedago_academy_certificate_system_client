@@ -12,6 +12,7 @@ import { ImageUpload } from "@/components/ui/ImageUpload";
 
 const competitionFormSchema = z.object({
   name: z.string().min(1, "Name is required").trim(),
+  category: z.string().min(1, "Category is required").trim(),
   description: z.string().optional().default(""),
   refPrefix: z.string().min(1, "Prefix is required").trim(),
   refPadding: z.coerce.number().min(0).max(6).default(0),
@@ -33,6 +34,7 @@ export function CompetitionForm({ initialData, onSubmit, onClose, isLoading }) {
     mode: "onChange",
     defaultValues: {
       name: initialData?.name || "",
+      category: initialData?.category || "General",
       description: initialData?.description || "",
       refPrefix: initialData?.refPrefix || "",
       refPadding: initialData?.refPadding ?? 0,
@@ -47,6 +49,7 @@ export function CompetitionForm({ initialData, onSubmit, onClose, isLoading }) {
     if (initialData) {
       reset({
         name: initialData.name || "",
+        category: initialData.category || "General",
         description: initialData.description || "",
         refPrefix: initialData.refPrefix || "",
         refPadding: initialData.refPadding ?? 0,
@@ -69,12 +72,22 @@ export function CompetitionForm({ initialData, onSubmit, onClose, isLoading }) {
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
-      <Input
-        label="Competition Name *"
-        placeholder="e.g. National Science Olympiad 2026"
-        error={errors.name?.message}
-        {...register("name")}
-      />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Input
+          label="Competition Name *"
+          placeholder="e.g. National Science Olympiad 2026"
+          error={errors.name?.message}
+          {...register("name")}
+        />
+
+        <Input
+          label="Category *"
+          placeholder="e.g. Science, Olympiad, Art, Coding"
+          helperText="Mandatory competition category"
+          error={errors.category?.message}
+          {...register("category")}
+        />
+      </div>
 
       <Input
         label="Reference Prefix *"

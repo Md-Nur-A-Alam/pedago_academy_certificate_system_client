@@ -1,7 +1,20 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Search, Download, Sparkles, Award, User, RefreshCw, UploadCloud, CheckCircle2, AlertCircle } from "lucide-react";
+import {
+  Search,
+  Download,
+  Sparkles,
+  Award,
+  User,
+  RefreshCw,
+  UploadCloud,
+  CheckCircle2,
+  AlertCircle,
+  Layers,
+  Tag,
+  Check,
+} from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
@@ -16,8 +29,8 @@ const DEFAULT_FALLBACK_PHOTO =
 export default function PostersPage() {
   const [query, setQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
-  const [participantData, setParticipantData] = useState(null);
-  const [posterTemplate, setPosterTemplate] = useState(null);
+  const [resultsList, setResultsList] = useState([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [userPhoto, setUserPhoto] = useState("");
   const [isUpdatingPhoto, setIsUpdatingPhoto] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -25,6 +38,16 @@ export default function PostersPage() {
   // Responsive Canvas container scaling
   const [containerWidth, setContainerWidth] = useState(600);
   const containerRef = useRef(null);
+
+  const activeResult = resultsList[selectedIndex] || null;
+  const participantData = activeResult?.participant || null;
+  const posterTemplate = activeResult?.posterTemplate || null;
+
+  useEffect(() => {
+    if (participantData) {
+      setUserPhoto(participantData.mediaUrl || DEFAULT_FALLBACK_PHOTO);
+    }
+  }, [selectedIndex, participantData]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -39,37 +62,52 @@ export default function PostersPage() {
     return () => observer.disconnect();
   }, [participantData, posterTemplate]);
 
-  // Search by reference code or phone
+  // Search by reference code or phone (last 6 digits)
   const handleSearch = async (e) => {
     if (e) e.preventDefault();
     const trimmed = query.trim();
     if (!trimmed) {
-      toast.warning("Please enter your Reference Number or Phone");
+      toast.warning("Please enter your Reference Number or Phone Number");
       return;
     }
 
     setIsSearching(true);
-    setParticipantData(null);
-    setPosterTemplate(null);
+    setResultsList([]);
+    setSelectedIndex(0);
 
     try {
-      const isPhoneSearch = /^(\+)?\d{6,15}$/.test(trimmed);
-      const endpoint = isPhoneSearch
-        ? `/api/participants/verify?phone=${encodeURIComponent(trimmed)}`
-        : `/api/participants/verify?refNumber=${encodeURIComponent(trimmed)}`;
-
+      const endpoint = `/api/participants/verify?query=${encodeURIComponent(trimmed)}`;
       const { data } = await apiClient.get(endpoint);
+
       if (data?.data) {
-        const participant = data.data.participant;
-        setParticipantData(participant);
-        setPosterTemplate(data.data.posterTemplate);
-        setUserPhoto(participant.mediaUrl || DEFAULT_FALLBACK_PHOTO);
-        toast.success(`Found record for ${participant.name}!`);
+        const list =
+          data.data.results && data.data.results.length > 0
+            ? data.data.results
+            : [
+                {
+                  participant: data.data.participant,
+                  certificateTemplate: data.data.certificateTemplate,
+                  posterTemplate: data.data.posterTemplate,
+                },
+              ];
+
+        setResultsList(list);
+        setSelectedIndex(0);
+        const firstParticipant = list[0].participant;
+        setUserPhoto(firstParticipant.mediaUrl || DEFAULT_FALLBACK_PHOTO);
+
+        if (list.length > 1) {
+          toast.success(
+            `Found ${list.length} registrations across categories/competitions!`
+          );
+        } else {
+          toast.success(`Found record for ${firstParticipant.name}!`);
+        }
       }
     } catch (err) {
       const msg =
         err.response?.data?.message ||
-        "No participant record found. Please verify your reference number.";
+        "No participant record found. Please verify your reference or phone number.";
       toast.error(msg);
     } finally {
       setIsSearching(false);
@@ -87,7 +125,20 @@ export default function PostersPage() {
         refNumber: participantData.refNumber,
         mediaUrl: newUrl,
       });
-      setParticipantData((prev) => ({ ...prev, mediaUrl: newUrl }));
+
+      // Update both active participant and item in resultsList
+      participantData.mediaUrl = newUrl;
+      setResultsList((prev) =>
+        prev.map((item, i) =>
+          i === selectedIndex
+            ? {
+                ...item,
+                participant: { ...item.participant, mediaUrl: newUrl },
+              }
+            : item
+        )
+      );
+
       toast.success("Your poster photo has been updated!");
     } catch (err) {
       toast.error("Failed to save updated photo to your record");
@@ -198,8 +249,9 @@ export default function PostersPage() {
 
         // Save file to user
         const safeName = (participantData.name || "Participant").replace(/[^a-z0-9]/gi, "_");
+        const safeCat = (participantData.category || "General").replace(/[^a-z0-9]/gi, "_");
         const link = document.createElement("a");
-        link.download = `${safeName}_Pedago_Poster.png`;
+        link.download = `${safeName}_${safeCat}_Pedago_Poster.png`;
         link.href = canvas.toDataURL("image/png");
         link.click();
         setIsDownloading(false);
@@ -277,7 +329,7 @@ export default function PostersPage() {
             Create Your Personalized Achievement Poster
           </h1>
           <p className="text-gray-600 text-sm sm:text-base max-w-xl mx-auto">
-            Search by your reference ID, upload your favorite picture, and download your personalized high-resolution social media poster.
+            Search by your Reference ID or Phone Number (matches last 6 digits), select your competition or category, upload your portrait picture, and download your personalized high-resolution social media poster.
           </p>
         </div>
 
@@ -288,7 +340,7 @@ export default function PostersPage() {
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Enter Reference Number (e.g. COMP-001) or Phone..."
+                placeholder="Enter Reference Code (e.g. COMP-001) or Phone (e.g. 01712345678 or last 6 digits)..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#29479B] focus:border-transparent text-sm"
@@ -298,13 +350,105 @@ export default function PostersPage() {
               type="submit"
               variant="primary"
               disabled={isSearching}
-              className="gap-2 px-6 py-3 shrink-0"
+              className="gap-2 px-6 py-3 shrink-0 bg-[#29479B] hover:bg-[#1A284A] text-white"
             >
               {isSearching ? <Spinner size="sm" /> : <Search className="w-4 h-4" />}
               <span>Find My Poster</span>
             </Button>
           </form>
+          <div className="flex items-center gap-2 mt-2.5 text-xs text-gray-400">
+            <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+            <span>
+              Tip: Enter your phone number (matches last 6 digits). If you joined multiple categories, all your records will appear.
+            </span>
+          </div>
         </div>
+
+        {/* Multi-Result Poster Selector (When multiple registrations found) */}
+        {resultsList.length > 1 && (
+          <div className="bg-gradient-to-br from-amber-50/70 via-white to-purple-50/50 p-6 rounded-2xl border border-amber-200/70 shadow-sm space-y-4">
+            <div className="flex items-center gap-2.5 pb-3 border-b border-amber-100">
+              <div className="w-10 h-10 rounded-xl bg-[#F59E0B] text-white flex items-center justify-center shadow-xs">
+                <Layers className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-[#1A284A] flex items-center gap-2">
+                  Found {resultsList.length} Registrations
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold">
+                    Multi-Category / Multi-Competition
+                  </span>
+                </h3>
+                <p className="text-xs text-gray-500">
+                  Select which category or competition you want to generate the poster for:
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {resultsList.map((resItem, idx) => {
+                const isSelected = idx === selectedIndex;
+                const p = resItem.participant;
+                const hasTemplate = !!resItem.posterTemplate;
+
+                return (
+                  <div
+                    key={p._id || idx}
+                    onClick={() => setSelectedIndex(idx)}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between text-left ${
+                      isSelected
+                        ? "bg-white border-[#F59E0B] ring-2 ring-[#F59E0B]/30 shadow-md scale-[1.01]"
+                        : "bg-white/70 hover:bg-white border-gray-200 hover:border-amber-300 hover:shadow-xs"
+                    }`}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                          <Tag className="w-3 h-3 mr-1" />
+                          {p.category || "General"}
+                        </span>
+                        <Badge
+                          variant={p.achievementType === "winner" ? "warning" : "info"}
+                          className="text-[10px] capitalize font-bold"
+                        >
+                          {p.achievementType}
+                        </Badge>
+                      </div>
+
+                      <h4 className="font-bold text-sm text-[#1A284A] line-clamp-1">
+                        {p.competition?.name || "Competition"}
+                      </h4>
+
+                      <div className="flex items-center justify-between text-xs text-gray-500 pt-1 border-t border-gray-100">
+                        <span className="font-mono font-bold text-gray-700">
+                          {p.refNumber}
+                        </span>
+                        {hasTemplate ? (
+                          <span className="text-emerald-600 font-semibold text-[11px] flex items-center gap-1">
+                            <Check className="w-3 h-3" /> Poster Ready
+                          </span>
+                        ) : (
+                          <span className="text-amber-600 font-semibold text-[11px]">
+                            In Prep
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 pt-2 flex items-center justify-between">
+                      <span
+                        className={`text-xs font-bold ${
+                          isSelected ? "text-amber-600" : "text-gray-400"
+                        }`}
+                      >
+                        {isSelected ? "● Currently Selected" : "Click to select"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Participant & Poster Result */}
         {participantData && (
@@ -325,6 +469,9 @@ export default function PostersPage() {
                       <Award className="w-3.5 h-3.5 mr-1" />
                       {participantData.achievementType}
                     </Badge>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-white/20 text-white">
+                      Category: {participantData.category || "General"}
+                    </span>
                   </div>
                   <p className="text-xs text-blue-200 mt-1">
                     Competition:{" "}
@@ -380,7 +527,7 @@ export default function PostersPage() {
                   <div className="flex items-center justify-between text-xs text-gray-500">
                     <span className="font-bold text-gray-700 flex items-center gap-1.5">
                       <Sparkles className="w-4 h-4 text-amber-500" />
-                      Live Poster Preview
+                      Live Poster Preview ({participantData.category || "General"})
                     </span>
                     <span>Format: Portrait Social Media</span>
                   </div>
@@ -500,7 +647,7 @@ export default function PostersPage() {
                 <AlertCircle className="w-10 h-10 text-amber-500 mx-auto" />
                 <h3 className="font-bold text-gray-800">Poster Template in Preparation</h3>
                 <p className="text-sm text-gray-500 max-w-md mx-auto">
-                  The official poster artwork for <strong>{participantData.competition?.name}</strong> is currently being uploaded by the administration. Please check back shortly!
+                  The official poster artwork for <strong>{participantData.competition?.name}</strong> ({participantData.category || "General"}) is currently being uploaded by the administration. Please check back shortly!
                 </p>
               </div>
             )}

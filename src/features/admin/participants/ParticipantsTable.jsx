@@ -184,7 +184,10 @@ export function ParticipantsTable() {
                       <div className="text-[11px] text-gray-400">Age: {p.age || "N/A"}</div>
                     </td>
                     <td className="px-6 py-4 text-xs text-gray-700">
-                      {p.competitionId?.name || "N/A"}
+                      <div className="font-medium text-gray-900">{p.competitionId?.name || "N/A"}</div>
+                      <span className="inline-flex items-center px-1.5 py-0.5 mt-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-100">
+                        {p.category || "General"}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <Badge variant={p.achievementType === "winner" ? "warning" : "info"}>

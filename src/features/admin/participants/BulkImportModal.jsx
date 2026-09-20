@@ -43,6 +43,7 @@ export function BulkImportModal({ isOpen, onClose, competitions = [], onBulkUplo
       "Participant Name (Required)",
       "Phone Number (Required)",
       "Age (Required)",
+      "Category (Required)",
       "Source URL (Required)",
       "Media URL (Optional)",
     ];
@@ -53,20 +54,23 @@ export function BulkImportModal({ isOpen, onClose, competitions = [], onBulkUplo
         "Alex Rahman",
         "+8801700000001",
         22,
+        "Junior",
         "https://facebook.com/pedago/posts/10001",
         "https://i.ibb.co/sample1/photo.jpg",
+      ],
+      [
+        "Alex Rahman",
+        "+8801700000001",
+        22,
+        "Senior",
+        "https://facebook.com/pedago/posts/10002",
+        "",
       ],
       [
         "Sarah Khan",
         "+8801800000002",
         19,
-        "https://facebook.com/pedago/posts/10002",
-        "",
-      ],
-      [
-        "Tanvir Hasan",
-        "+8801900000003",
-        25,
+        "Group A",
         "https://facebook.com/pedago/posts/10003",
         "https://i.ibb.co/sample3/avatar.png",
       ],
@@ -80,6 +84,7 @@ export function BulkImportModal({ isOpen, onClose, competitions = [], onBulkUplo
       { wch: 26 }, // Name
       { wch: 22 }, // Phone
       { wch: 14 }, // Age
+      { wch: 18 }, // Category
       { wch: 42 }, // Source URL
       { wch: 38 }, // Media URL
     ];
@@ -129,6 +134,7 @@ export function BulkImportModal({ isOpen, onClose, competitions = [], onBulkUplo
           const nameKey = findColumnKey(row, ["participantname", "name", "fullname"]);
           const phoneKey = findColumnKey(row, ["phonenumber", "phone", "mobile", "contact"]);
           const ageKey = findColumnKey(row, ["age", "years"]);
+          const categoryKey = findColumnKey(row, ["category", "catagory", "group", "track"]);
           const sourceKey = findColumnKey(row, ["sourceurl", "source", "sourcelink", "posturl", "submission"]);
           const mediaKey = findColumnKey(row, ["mediaurl", "media", "medialink", "image", "photourl", "upload"]);
 
@@ -136,6 +142,7 @@ export function BulkImportModal({ isOpen, onClose, competitions = [], onBulkUplo
           const phone = phoneKey ? String(row[phoneKey]).trim() : "";
           const ageRaw = ageKey ? row[ageKey] : "";
           const age = Number(ageRaw) || 0;
+          const category = categoryKey ? String(row[categoryKey]).trim() : "General";
           const sourceUrl = sourceKey ? String(row[sourceKey]).trim() : "";
           const mediaUrl = mediaKey ? String(row[mediaKey]).trim() : "";
 
@@ -144,6 +151,7 @@ export function BulkImportModal({ isOpen, onClose, competitions = [], onBulkUplo
           if (!name) errors.push("Missing name");
           if (!phone) errors.push("Missing phone");
           if (!age || age < 1) errors.push("Invalid age");
+          if (!category) errors.push("Missing category");
           if (!sourceUrl) errors.push("Missing source URL");
 
           return {
@@ -151,6 +159,7 @@ export function BulkImportModal({ isOpen, onClose, competitions = [], onBulkUplo
             name,
             phone,
             age: age > 0 ? age : "",
+            category,
             sourceUrl,
             mediaUrl,
             achievementType: selectedAchievementType,
@@ -282,6 +291,7 @@ export function BulkImportModal({ isOpen, onClose, competitions = [], onBulkUplo
                       <th className="px-3 py-2">Row #</th>
                       <th className="px-3 py-2">Name</th>
                       <th className="px-3 py-2">Phone</th>
+                      <th className="px-3 py-2">Category</th>
                       <th className="px-3 py-2">Reason</th>
                     </tr>
                   </thead>
@@ -293,8 +303,13 @@ export function BulkImportModal({ isOpen, onClose, competitions = [], onBulkUplo
                         </td>
                         <td className="px-3 py-2 font-medium text-gray-900">{dup.name}</td>
                         <td className="px-3 py-2 font-mono text-gray-600">{dup.phone}</td>
+                        <td className="px-3 py-2">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700">
+                            {dup.category || "General"}
+                          </span>
+                        </td>
                         <td className="px-3 py-2 text-amber-700 font-medium">
-                          {dup.reason || `Already registered (Ref: ${dup.existingRefNumber})`}
+                          {dup.reason || `Already registered in this category (Ref: ${dup.existingRefNumber})`}
                         </td>
                       </tr>
                     ))}
@@ -437,6 +452,7 @@ export function BulkImportModal({ isOpen, onClose, competitions = [], onBulkUplo
                         <th className="px-3 py-2">Name</th>
                         <th className="px-3 py-2">Phone</th>
                         <th className="px-3 py-2">Age</th>
+                        <th className="px-3 py-2">Category</th>
                         <th className="px-3 py-2">Source URL</th>
                         <th className="px-3 py-2">Media URL</th>
                         <th className="px-3 py-2">Status</th>
@@ -452,6 +468,11 @@ export function BulkImportModal({ isOpen, onClose, competitions = [], onBulkUplo
                           <td className="px-3 py-2 font-medium text-gray-900">{row.name || "—"}</td>
                           <td className="px-3 py-2 font-mono">{row.phone || "—"}</td>
                           <td className="px-3 py-2">{row.age || "—"}</td>
+                          <td className="px-3 py-2">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700">
+                              {row.category || "General"}
+                            </span>
+                          </td>
                           <td className="px-3 py-2 max-w-[150px] truncate text-blue-600 font-mono" title={row.sourceUrl}>
                             {row.sourceUrl || "—"}
                           </td>

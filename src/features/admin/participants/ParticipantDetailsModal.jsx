@@ -194,6 +194,11 @@ export function ParticipantDetailsModal({ isOpen, onClose, participant, onUpdate
                 <strong className="text-white">
                   {participant.competitionId?.name || "Competition"}
                 </strong>
+                <span className="mx-2 text-white/40">•</span>
+                Category:{" "}
+                <span className="px-2 py-0.5 rounded bg-white/20 text-white font-semibold">
+                  {participant.category || "General"}
+                </span>
               </p>
             </div>
           </div>
@@ -254,10 +259,9 @@ export function ParticipantDetailsModal({ isOpen, onClose, participant, onUpdate
               </div>
 
               <div>
-                <span className="text-xs text-gray-400 block">Registered On</span>
-                <span className="text-xs text-gray-700 font-medium mt-0.5 block flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5 text-gray-400" />
-                  {formattedDate}
+                <span className="text-xs text-gray-400 block">Category</span>
+                <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded text-xs inline-block mt-0.5 border border-blue-100">
+                  {participant.category || "General"}
                 </span>
               </div>
 
@@ -265,6 +269,14 @@ export function ParticipantDetailsModal({ isOpen, onClose, participant, onUpdate
                 <span className="text-xs text-gray-400 block">Achievement Tier</span>
                 <span className="text-xs capitalize font-bold text-gray-800 mt-0.5 block">
                   {participant.achievementType}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-xs text-gray-400 block">Registered On</span>
+                <span className="text-xs text-gray-700 font-medium mt-0.5 block flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-gray-400" />
+                  {formattedDate}
                 </span>
               </div>
             </div>
