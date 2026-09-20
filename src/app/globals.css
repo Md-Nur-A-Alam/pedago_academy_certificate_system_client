@@ -84,3 +84,32 @@ body {
 .animate-wobble {
   animation: wobble 3s ease-in-out infinite;
 }
+
+@keyframes morph-amoeba {
+  0%, 100% {
+    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+  }
+  33% {
+    border-radius: 40% 60% 70% 30% / 50% 60% 30% 60%;
+  }
+  66% {
+    border-radius: 30% 60% 70% 40% / 60% 40% 60% 40%;
+  }
+}
+
+.animate-morph-amoeba {
+  animation: morph-amoeba 8s ease-in-out infinite, float 6s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.025);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3.5s ease-in-out infinite, float 5s ease-in-out infinite;
+}

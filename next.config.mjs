@@ -41,6 +41,10 @@ const nextConfig = {
         destination: `${backendUrl}/api/settings/:path*`,
       },
       {
+        source: "/api/homepage-setting/:path*",
+        destination: `${backendUrl}/api/homepage-setting/:path*`,
+      },
+      {
         source: "/api/upload/:path*",
         destination: `${backendUrl}/api/upload/:path*`,
       },

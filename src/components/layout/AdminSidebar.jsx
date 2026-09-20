@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Settings,
   Sparkles,
+  LayoutTemplate,
 } from "lucide-react";
 import { useCurrentAdmin } from "@/features/admin/auth/useCurrentAdmin";
 import { useSystemSettings } from "@/hooks/useSystemSettings";
@@ -32,6 +33,7 @@ export function AdminSidebar() {
     { label: "Participants", href: "/admin/participants", icon: Users },
     { label: "Certificate Templates", href: "/admin/certificate-templates", icon: Award },
     { label: "Poster Templates", href: "/admin/poster-templates", icon: ImageIcon },
+    { label: "Home Page Settings", href: "/admin/home-settings", icon: LayoutTemplate },
   ];
 
   const adminItem = { label: "Admins", href: "/admin/admins", icon: ShieldCheck, superOnly: true };
