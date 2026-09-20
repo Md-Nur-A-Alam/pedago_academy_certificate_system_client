@@ -1,19 +1,39 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { useSystemSettings } from "@/hooks/useSystemSettings";
 
 export function PublicNavbar() {
+  const { settings } = useSystemSettings();
+  const [logoError, setLogoError] = useState(false);
+
+  const logoSrc = !logoError && settings?.logoUrl ? settings.logoUrl : null;
+  const siteTitle = settings?.siteTitle || "PEDAGO ACADEMY";
+
   return (
     <header className="sticky top-0 z-50 bg-[#1A284A] text-white shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3">
-          <div className="relative w-12 h-12 bg-white rounded-lg p-1 flex items-center justify-center">
-            <span className="text-[#29479B] font-extrabold text-xl">PA</span>
+        <Link href="/" className="flex items-center gap-3.5 group">
+          <div className="relative w-12 h-12 bg-white rounded-xl p-1 flex items-center justify-center shadow-xs overflow-hidden shrink-0 group-hover:scale-105 transition-transform">
+            {logoSrc ? (
+              <img
+                src={logoSrc}
+                alt={siteTitle}
+                className="w-full h-full object-contain"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <span className="text-[#29479B] font-extrabold text-xl">PA</span>
+            )}
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-lg leading-tight text-white tracking-wide">PEDAGO ACADEMY</span>
-            <span className="text-xs text-[#F59E0B] font-medium tracking-wider">CERTIFICATE VERIFICATION PORTAL</span>
+            <span className="font-bold text-lg leading-tight text-white tracking-wide uppercase">
+              {siteTitle}
+            </span>
+            <span className="text-xs text-[#F59E0B] font-semibold tracking-wider">
+              CERTIFICATE VERIFICATION PORTAL
+            </span>
           </div>
         </Link>
 

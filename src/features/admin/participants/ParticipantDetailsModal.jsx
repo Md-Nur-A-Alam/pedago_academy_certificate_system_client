@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ExternalLink,
   Copy,
@@ -18,10 +18,15 @@ import {
   Clock,
   Sparkles,
   ShieldCheck,
+  UploadCloud,
+  Pencil,
+  Save,
+  RotateCcw,
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { ImageUpload } from "@/components/ui/ImageUpload";
 import { toast } from "react-toastify";
 
 function FacebookIcon({ className = "w-5 h-5 text-blue-600" }) {
@@ -89,9 +94,19 @@ function isImageUrl(url = "") {
   );
 }
 
-export function ParticipantDetailsModal({ isOpen, onClose, participant }) {
+export function ParticipantDetailsModal({ isOpen, onClose, participant, onUpdateParticipant }) {
   const [copiedRef, setCopiedRef] = useState(false);
   const [copiedPhone, setCopiedPhone] = useState(false);
+  const [isEditingMedia, setIsEditingMedia] = useState(false);
+  const [mediaUrlInput, setMediaUrlInput] = useState("");
+  const [isSavingMedia, setIsSavingMedia] = useState(false);
+
+  useEffect(() => {
+    if (participant) {
+      setMediaUrlInput(participant.mediaUrl || "");
+      setIsEditingMedia(false);
+    }
+  }, [participant]);
 
   if (!participant) return null;
 
@@ -109,8 +124,27 @@ export function ParticipantDetailsModal({ isOpen, onClose, participant }) {
     setTimeout(() => setCopiedPhone(false), 2000);
   };
 
+  const handleSaveMedia = async () => {
+    if (!onUpdateParticipant || !participant?._id) return;
+    setIsSavingMedia(true);
+    try {
+      await onUpdateParticipant({
+        id: participant._id,
+        data: { mediaUrl: mediaUrlInput },
+      });
+      participant.mediaUrl = mediaUrlInput;
+      setIsEditingMedia(false);
+      toast.success("Participant media updated successfully!");
+    } catch (err) {
+      toast.error("Failed to update participant media");
+    } finally {
+      setIsSavingMedia(false);
+    }
+  };
+
+  const currentActiveMedia = isEditingMedia ? mediaUrlInput : participant.mediaUrl;
   const sourceParsed = parseSourceUrl(participant.sourceUrl);
-  const mediaIsImage = isImageUrl(participant.mediaUrl);
+  const mediaIsImage = isImageUrl(currentActiveMedia);
 
   const formattedDate = participant.createdAt
     ? new Date(participant.createdAt).toLocaleDateString("en-US", {
@@ -382,34 +416,93 @@ export function ParticipantDetailsModal({ isOpen, onClose, participant }) {
           )}
         </div>
 
-        {/* MEDIA PREVIEW IF ATTACHED */}
-        {participant.mediaUrl ? (
-          <div className="border border-gray-200 rounded-2xl p-5 space-y-4 bg-white shadow-xs">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <div className="flex items-center gap-2">
-                <ImageIcon className="w-5 h-5 text-purple-600" />
-                <div>
-                  <h4 className="font-bold text-sm text-[#1A284A]">
-                    Attached Participant Media / Photo
-                  </h4>
-                  <p className="text-xs text-gray-500">
-                    Image or media asset associated with this participant
-                  </p>
-                </div>
+        {/* MEDIA PREVIEW & IN-PLACE UPLOAD */}
+        <div className="border border-gray-200 rounded-2xl p-5 space-y-4 bg-white shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+            <div className="flex items-center gap-2">
+              <ImageIcon className="w-5 h-5 text-purple-600" />
+              <div>
+                <h4 className="font-bold text-sm text-[#1A284A]">
+                  Attached Participant Media / Photo
+                </h4>
+                <p className="text-xs text-gray-500">
+                  Image or media asset associated with this participant (used for poster cutout)
+                </p>
               </div>
-
-              <a
-                href={participant.mediaUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
-              >
-                <span>View Full Size</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
             </div>
 
-            {mediaIsImage ? (
+            <div className="flex items-center gap-2">
+              {participant.mediaUrl && !isEditingMedia && (
+                <a
+                  href={participant.mediaUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
+                >
+                  <span>View Full Size</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              )}
+
+              {onUpdateParticipant && !isEditingMedia && (
+                <button
+                  type="button"
+                  onClick={() => setIsEditingMedia(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors cursor-pointer shadow-xs"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>{participant.mediaUrl ? "Change Media / Photo" : "Upload Photo"}</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* In-Place Image Upload Editor */}
+          {isEditingMedia ? (
+            <div className="p-4 bg-purple-50/40 rounded-xl border border-purple-100 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
+                  <UploadCloud className="w-4 h-4 text-purple-600" />
+                  Upload or Select New Participant Media
+                </span>
+                <span className="text-[11px] text-gray-400">Auto-hosted on ImgBB</span>
+              </div>
+
+              <ImageUpload
+                value={mediaUrlInput}
+                onChange={setMediaUrlInput}
+                helpText="Drag and drop photo, select file (ImgBB), or paste direct/Facebook image URL"
+              />
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-purple-200/50">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setMediaUrlInput(participant.mediaUrl || "");
+                    setIsEditingMedia(false);
+                  }}
+                  disabled={isSavingMedia}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={handleSaveMedia}
+                  disabled={isSavingMedia}
+                  className="gap-1.5 bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  {isSavingMedia ? "Saving..." : "Save Participant Media"}
+                </Button>
+              </div>
+            </div>
+          ) : participant.mediaUrl ? (
+            mediaIsImage ? (
               <div className="w-full rounded-xl overflow-hidden border border-gray-200 bg-gray-900/5 flex items-center justify-center p-2 max-h-[400px]">
                 <img
                   src={participant.mediaUrl}
@@ -435,13 +528,34 @@ export function ParticipantDetailsModal({ isOpen, onClose, participant }) {
                   Download File
                 </a>
               </div>
-            )}
-          </div>
-        ) : (
-          <div className="p-4 rounded-xl border border-dashed border-gray-200 text-center text-xs text-gray-400">
-            No media attachment uploaded for this participant.
-          </div>
-        )}
+            )
+          ) : (
+            <div className="p-8 rounded-xl border border-dashed border-gray-200 text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center mx-auto">
+                <UploadCloud className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-700">
+                  No photo or media attachment uploaded yet
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Add a photo to enable recipient picture cutout on personalized milestone posters
+                </p>
+              </div>
+              {onUpdateParticipant && (
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setIsEditingMedia(true)}
+                  className="bg-purple-600 hover:bg-purple-700 text-white gap-1.5 shadow-xs"
+                >
+                  <UploadCloud className="w-4 h-4" /> Upload Photo Now
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Modal Footer */}
         <div className="flex justify-end pt-3 border-t border-gray-100">

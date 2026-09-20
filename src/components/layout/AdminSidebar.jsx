@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -13,10 +14,17 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useCurrentAdmin } from "@/features/admin/auth/useCurrentAdmin";
+import { useSystemSettings } from "@/hooks/useSystemSettings";
 
 export function AdminSidebar() {
   const pathname = usePathname();
   const { isSuperAdmin } = useCurrentAdmin();
+  const { settings } = useSystemSettings();
+  const [logoError, setLogoError] = useState(false);
+
+  const logoSrc = !logoError && settings?.logoUrl ? settings.logoUrl : null;
+  const siteTitle = settings?.siteTitle || "PEDAGO";
+  const brandName = siteTitle.split(" ")[0] || "PEDAGO";
 
   const baseNavItems = [
     { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
@@ -40,13 +48,22 @@ export function AdminSidebar() {
     <aside className="w-64 bg-[#1A284A] text-white flex flex-col min-h-screen shrink-0 border-r border-white/5 select-none">
       {/* Brand Header */}
       <div className="h-16 px-6 border-b border-white/10 flex items-center justify-between">
-        <Link href="/admin/dashboard" className="flex items-center gap-2.5 group">
-          <div className="w-8 h-8 rounded-lg bg-[#29479B] flex items-center justify-center text-[#F59E0B] shadow-inner group-hover:scale-105 transition-transform">
-            <Sparkles className="w-4 h-4" />
+        <Link href="/admin/dashboard" className="flex items-center gap-3 group">
+          <div className="w-9 h-9 rounded-lg bg-white p-1 flex items-center justify-center shadow-inner group-hover:scale-105 transition-transform overflow-hidden shrink-0">
+            {logoSrc ? (
+              <img
+                src={logoSrc}
+                alt={brandName}
+                className="w-full h-full object-contain"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <Sparkles className="w-4 h-4 text-[#29479B]" />
+            )}
           </div>
           <div>
             <span className="font-extrabold text-base tracking-tight text-white block leading-none">
-              PEDAGO
+              {brandName}
             </span>
             <span className="text-[11px] font-semibold text-[#F59E0B] tracking-wider uppercase">
               Admin Portal

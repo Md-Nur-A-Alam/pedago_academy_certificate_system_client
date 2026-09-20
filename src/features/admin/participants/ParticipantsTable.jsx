@@ -262,6 +262,7 @@ export function ParticipantsTable() {
         isOpen={Boolean(viewingParticipant)}
         onClose={() => setViewingParticipant(null)}
         participant={viewingParticipant}
+        onUpdateParticipant={updateParticipant}
       />
 
       {/* Single Participant Modal */}
