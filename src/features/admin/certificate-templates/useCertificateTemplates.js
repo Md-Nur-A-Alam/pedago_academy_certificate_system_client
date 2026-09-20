@@ -34,6 +34,23 @@ export function useCertificateTemplates(params = {}) {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id) => {
+      console.log("[HOOK DEBUG: CertificateTemplates] Deleting template:", id);
+      const { data } = await apiClient.delete(`/api/certificates/templates/${id}`);
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Certificate template deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["certificate-templates"] });
+    },
+    onError: (err) => {
+      const msg = err.response?.data?.message || err.message || "Failed to delete template";
+      console.error("[HOOK DEBUG: CertificateTemplates] Delete error:", msg);
+      toast.error(msg);
+    },
+  });
+
   return {
     templates: templatesQuery.data || [],
     isLoading: templatesQuery.isLoading,
@@ -41,5 +58,8 @@ export function useCertificateTemplates(params = {}) {
     error: templatesQuery.error,
     saveTemplate: saveMutation.mutateAsync,
     isSaving: saveMutation.isPending,
+    deleteTemplate: deleteMutation.mutateAsync,
+    isDeleting: deleteMutation.isPending,
+    refetchTemplates: templatesQuery.refetch,
   };
 }

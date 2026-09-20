@@ -1,5 +1,5 @@
-import { CertificateTemplateDesigner } from "@/features/admin/certificate-templates/CertificateTemplateDesigner";
+import { CertificateTemplatesManager } from "@/features/admin/certificate-templates/CertificateTemplatesManager";
 
 export default function AdminCertificateTemplatesPage() {
-  return <CertificateTemplateDesigner />;
+  return <CertificateTemplatesManager />;
 }
