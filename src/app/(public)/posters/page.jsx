@@ -1,54 +1,183 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import {
-  Search,
+  UploadCloud,
   Download,
   Sparkles,
   Award,
-  User,
-  RefreshCw,
-  UploadCloud,
-  CheckCircle2,
-  AlertCircle,
   Layers,
-  Tag,
   Check,
+  Circle,
+  Square,
+  RectangleVertical,
+  Image as ImageIcon,
+  User,
+  Sliders,
+  CheckCircle2,
+  RefreshCw,
+  Eye,
+  Tag,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
-import { ImageUpload } from "@/components/ui/ImageUpload";
 import apiClient from "@/lib/api-client";
 import { toast } from "react-toastify";
+import { PosterPhotoCropper } from "@/features/posters/PosterPhotoCropper";
+import {
+  getCroppedImg,
+  generateCompositePoster,
+} from "@/features/posters/posterCanvasUtils";
 
-const DEFAULT_FALLBACK_PHOTO =
-  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80";
+const FALLBACK_POSTER_BG =
+  "https://i.ibb.co/yn2fx3J0/istockphoto-2162394672-612x612.jpg";
 
 export default function PostersPage() {
-  const [query, setQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
-  const [resultsList, setResultsList] = useState([]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [userPhoto, setUserPhoto] = useState("");
-  const [isUpdatingPhoto, setIsUpdatingPhoto] = useState(false);
+  // Templates state
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplateIndex, setSelectedTemplateIndex] = useState(0);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
+
+  // User uploaded image state
+  const [uploadedImageSrc, setUploadedImageSrc] = useState(null);
+  const [frameShape, setFrameShape] = useState("circle"); // 'circle' | 'rounded' | 'rectangle'
+
+  // Cropper interactive state
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+  const [croppedPreviewUrl, setCroppedPreviewUrl] = useState(null);
+
+  // User details for text zones (Name, etc.)
+  const [userName, setUserName] = useState("");
+
+  // Download state
   const [isDownloading, setIsDownloading] = useState(false);
 
-  // Responsive Canvas container scaling
-  const [containerWidth, setContainerWidth] = useState(600);
+  // Responsive Canvas container scaling for live preview
+  const [containerWidth, setContainerWidth] = useState(480);
   const containerRef = useRef(null);
+  const fileInputRef = useRef(null);
 
-  const activeResult = resultsList[selectedIndex] || null;
-  const participantData = activeResult?.participant || null;
-  const posterTemplate = activeResult?.posterTemplate || null;
-
+  // Fetch available poster templates
   useEffect(() => {
-    if (participantData) {
-      setUserPhoto(participantData.mediaUrl || DEFAULT_FALLBACK_PHOTO);
-    }
-  }, [selectedIndex, participantData]);
+    let isMounted = true;
+    const loadTemplates = async () => {
+      try {
+        const { data } = await apiClient.get("/api/posters/templates");
+        if (isMounted && data?.data && data.data.length > 0) {
+          setTemplates(data.data);
+          setSelectedTemplateIndex(0);
+          // Pre-populate default frame shape from template if available
+          const firstTemplate = data.data[0];
+          if (firstTemplate.photoZone?.shape) {
+            const sh = firstTemplate.photoZone.shape;
+            setFrameShape(
+              sh === "square" || sh === "rounded"
+                ? "rounded"
+                : sh === "rectangle"
+                ? "rectangle"
+                : "circle"
+            );
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load poster templates, using fallback:", err);
+      } finally {
+        if (isMounted) setIsLoadingTemplates(false);
+      }
+    };
+    loadTemplates();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
+  const activeTemplate = templates[selectedTemplateIndex] || {
+    backgroundImageUrl: FALLBACK_POSTER_BG,
+    photoZone: { x: 50, y: 45, w: 38, h: 38, shape: "circle" },
+    textZones: [
+      {
+        key: "name",
+        x: 50,
+        y: 80,
+        font: "Montserrat",
+        style: "bold",
+        size: 28,
+        color: "#FFFFFF",
+        align: "center",
+      },
+    ],
+    competitionId: { name: "Pedago Milestone Event" },
+  };
+
+  // Sync frame shape when template changes
+  const handleSelectTemplate = (idx) => {
+    setSelectedTemplateIndex(idx);
+    const tmpl = templates[idx];
+    if (tmpl?.photoZone?.shape) {
+      const sh = tmpl.photoZone.shape;
+      setFrameShape(
+        sh === "square" || sh === "rounded"
+          ? "rounded"
+          : sh === "rectangle"
+          ? "rectangle"
+          : "circle"
+      );
+    }
+  };
+
+  // Handle local file selection (instant, 0-lag, local FileReader)
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.warning("Please select a valid image file (.jpg, .png, .webp)");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setUploadedImageSrc(reader.result);
+      setCrop({ x: 0, y: 0 });
+      setZoom(1);
+      setRotation(0);
+      toast.success("Photo uploaded! Adjust the crop & frame below.");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Update live cropped preview URL when crop completes
+  const handleCropComplete = async (croppedArea, pixelCrop) => {
+    setCroppedAreaPixels(pixelCrop);
+    if (uploadedImageSrc && pixelCrop) {
+      try {
+        const croppedUrl = await getCroppedImg(
+          uploadedImageSrc,
+          pixelCrop,
+          frameShape,
+          rotation
+        );
+        setCroppedPreviewUrl(croppedUrl);
+      } catch (e) {
+        console.warn("Live crop preview error:", e);
+      }
+    }
+  };
+
+  // Re-generate cropped thumbnail when frame shape or rotation changes
+  useEffect(() => {
+    if (uploadedImageSrc && croppedAreaPixels) {
+      getCroppedImg(uploadedImageSrc, croppedAreaPixels, frameShape, rotation)
+        .then((url) => setCroppedPreviewUrl(url))
+        .catch(() => {});
+    }
+  }, [frameShape, rotation]);
+
+  // Responsive width observer for live preview scaling
   useEffect(() => {
     if (!containerRef.current) return;
     const updateWidth = () => {
@@ -60,599 +189,461 @@ export default function PostersPage() {
     const observer = new ResizeObserver(updateWidth);
     observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, [participantData, posterTemplate]);
+  }, [activeTemplate]);
 
-  // Search by reference code or phone (last 6 digits)
-  const handleSearch = async (e) => {
-    if (e) e.preventDefault();
-    const trimmed = query.trim();
-    if (!trimmed) {
-      toast.warning("Please enter your Reference Number or Phone Number");
-      return;
-    }
-
-    setIsSearching(true);
-    setResultsList([]);
-    setSelectedIndex(0);
-
-    try {
-      const endpoint = `/api/participants/verify?query=${encodeURIComponent(trimmed)}`;
-      const { data } = await apiClient.get(endpoint);
-
-      if (data?.data) {
-        const list =
-          data.data.results && data.data.results.length > 0
-            ? data.data.results
-            : [
-                {
-                  participant: data.data.participant,
-                  certificateTemplate: data.data.certificateTemplate,
-                  posterTemplate: data.data.posterTemplate,
-                },
-              ];
-
-        setResultsList(list);
-        setSelectedIndex(0);
-        const firstParticipant = list[0].participant;
-        setUserPhoto(firstParticipant.mediaUrl || DEFAULT_FALLBACK_PHOTO);
-
-        if (list.length > 1) {
-          toast.success(
-            `Found ${list.length} registrations across categories/competitions!`
-          );
-        } else {
-          toast.success(`Found record for ${firstParticipant.name}!`);
-        }
-      }
-    } catch (err) {
-      const msg =
-        err.response?.data?.message ||
-        "No participant record found. Please verify your reference or phone number.";
-      toast.error(msg);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  // Save new photo uploaded by user
-  const handlePhotoChange = async (newUrl) => {
-    if (!newUrl || !participantData?.refNumber) return;
-    setUserPhoto(newUrl);
-    setIsUpdatingPhoto(true);
-
-    try {
-      await apiClient.post("/api/participants/update-photo", {
-        refNumber: participantData.refNumber,
-        mediaUrl: newUrl,
-      });
-
-      // Update both active participant and item in resultsList
-      participantData.mediaUrl = newUrl;
-      setResultsList((prev) =>
-        prev.map((item, i) =>
-          i === selectedIndex
-            ? {
-                ...item,
-                participant: { ...item.participant, mediaUrl: newUrl },
-              }
-            : item
-        )
-      );
-
-      toast.success("Your poster photo has been updated!");
-    } catch (err) {
-      toast.error("Failed to save updated photo to your record");
-    } finally {
-      setIsUpdatingPhoto(false);
-    }
-  };
-
-  // Scaling helpers for responsive preview
-  const photoZone = posterTemplate?.photoZone || { x: 50, y: 35, w: 32, shape: "circle" };
-  const textZones = posterTemplate?.textZones || [];
+  // Scaling helpers for live responsive preview
+  const photoZone = activeTemplate.photoZone || { x: 50, y: 45, w: 35, h: 35 };
+  const textZones = activeTemplate.textZones || [];
   const nameZone = textZones.find((z) => z.key === "name") || {
     x: 50,
-    y: 82,
+    y: 80,
     font: "Montserrat",
     size: 26,
     color: "#FFFFFF",
     align: "center",
   };
-  const refZone = textZones.find((z) => z.key === "ref") || {
-    x: 50,
-    y: 88,
-    font: "Montserrat",
-    size: 16,
-    color: "#F59E0B",
-    align: "center",
-  };
 
   const scaleFont = (sizePt) => {
-    const base = Number(sizePt) || 20;
+    const base = Number(sizePt) || 24;
     const factor = containerWidth / 1000;
-    return Math.max(10, Math.round(base * factor * 1.3));
+    return Math.max(12, Math.round(base * factor * 1.3));
   };
 
-  const getTransform = (align = "center") => {
-    if (align === "left") return "translate(0%, -50%)";
-    if (align === "right") return "translate(-100%, -50%)";
-    return "translate(-50%, -50%)";
-  };
+  const photoWidthPercent = photoZone.w || 35;
+  const isRectangle = frameShape === "rectangle";
+  const isCircle = frameShape === "circle";
+  const isRounded = frameShape === "rounded";
 
-  const photoWidthPercent = photoZone.w || 30;
-  const photoShapeClass =
-    photoZone.shape === "circle"
-      ? "rounded-full"
-      : photoZone.shape === "rounded"
-      ? "rounded-2xl"
-      : "rounded-none";
+  // Class for live preview frame cutout
+  const frameClass = isCircle
+    ? "rounded-full"
+    : isRounded
+    ? "rounded-[22%]"
+    : "rounded-lg";
 
-  // Download High-Resolution Composite Poster (.PNG)
-  const handleDownloadPoster = () => {
-    if (!posterTemplate?.backgroundImageUrl) {
+  // Trigger high-resolution composite PNG download
+  const handleDownload = async () => {
+    if (!activeTemplate.backgroundImageUrl) {
       toast.error("Poster background image unavailable");
       return;
     }
 
     setIsDownloading(true);
-    const bgImg = new Image();
-    bgImg.crossOrigin = "anonymous";
-    bgImg.src = posterTemplate.backgroundImageUrl;
+    try {
+      const dataUrl = await generateCompositePoster({
+        bgUrl: activeTemplate.backgroundImageUrl,
+        photoSrc: uploadedImageSrc,
+        pixelCrop: croppedAreaPixels,
+        frameShape,
+        photoZone,
+        textZones,
+        customTexts: {
+          name: userName.trim() || "Participant",
+        },
+      });
 
-    bgImg.onload = () => {
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      canvas.width = bgImg.naturalWidth || 1200;
-      canvas.height = bgImg.naturalHeight || 1600;
+      const safeName = (userName.trim() || "Pedago_Participant").replace(
+        /[^a-z0-9]/gi,
+        "_"
+      );
+      const link = document.createElement("a");
+      link.download = `${safeName}_Milestone_Poster.png`;
+      link.href = dataUrl;
+      link.click();
 
-      // Draw background poster artwork
-      ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
-
-      const finishAndSave = () => {
-        // Draw Name text
-        if (participantData?.name) {
-          const nameSizePx = (nameZone.size || 26) * (canvas.width / 1000) * 1.3;
-          ctx.font = `bold ${nameSizePx}px "${nameZone.font || "Montserrat"}", sans-serif`;
-          ctx.fillStyle = nameZone.color || "#FFFFFF";
-          ctx.textAlign = nameZone.align || "center";
-          ctx.textBaseline = "middle";
-          ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
-          ctx.shadowBlur = 10;
-
-          const nameX = (nameZone.x / 100) * canvas.width;
-          const nameY = (nameZone.y / 100) * canvas.height;
-          ctx.fillText(participantData.name, nameX, nameY);
-        }
-
-        // Draw Reference Code text
-        if (participantData?.refNumber) {
-          const refSizePx = (refZone.size || 16) * (canvas.width / 1000) * 1.3;
-          ctx.font = `bold ${refSizePx}px "${refZone.font || "Montserrat"}", sans-serif`;
-          ctx.fillStyle = refZone.color || "#F59E0B";
-          ctx.textAlign = refZone.align || "center";
-          ctx.textBaseline = "middle";
-          ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
-          ctx.shadowBlur = 6;
-
-          const refX = (refZone.x / 100) * canvas.width;
-          const refY = (refZone.y / 100) * canvas.height;
-          ctx.fillText(participantData.refNumber, refX, refY);
-        }
-
-        // Record download count
-        apiClient
-          .post("/api/participants/record-download", {
-            refNumber: participantData.refNumber,
-            type: "poster",
-          })
-          .catch(() => {});
-
-        // Save file to user
-        const safeName = (participantData.name || "Participant").replace(/[^a-z0-9]/gi, "_");
-        const safeCat = (participantData.category || "General").replace(/[^a-z0-9]/gi, "_");
-        const link = document.createElement("a");
-        link.download = `${safeName}_${safeCat}_Pedago_Poster.png`;
-        link.href = canvas.toDataURL("image/png");
-        link.click();
-        setIsDownloading(false);
-        toast.success("Poster generated and downloaded successfully!");
-      };
-
-      // Load & Clip user photo onto canvas
-      if (userPhoto) {
-        const userImg = new Image();
-        userImg.crossOrigin = "anonymous";
-        userImg.src = userPhoto;
-
-        userImg.onload = () => {
-          ctx.save();
-          const pW = ((photoZone.w || 30) / 100) * canvas.width;
-          const pH = pW; // 1:1 aspect ratio cutout
-          const pX = (photoZone.x / 100) * canvas.width - pW / 2;
-          const pY = (photoZone.y / 100) * canvas.height - pH / 2;
-
-          ctx.beginPath();
-          if (photoZone.shape === "circle") {
-            ctx.arc(pX + pW / 2, pY + pH / 2, pW / 2, 0, Math.PI * 2);
-          } else if (photoZone.shape === "rounded") {
-            const r = pW * 0.12;
-            ctx.roundRect(pX, pY, pW, pH, r);
-          } else {
-            ctx.rect(pX, pY, pW, pH);
-          }
-          ctx.closePath();
-          ctx.clip();
-
-          // Cover-fit user photo inside cutout
-          const imgRatio = userImg.naturalWidth / userImg.naturalHeight;
-          let drawW = pW;
-          let drawH = pH;
-          let dx = pX;
-          let dy = pY;
-
-          if (imgRatio > 1) {
-            drawW = pH * imgRatio;
-            dx = pX - (drawW - pW) / 2;
-          } else {
-            drawH = pW / imgRatio;
-            dy = pY - (drawH - pH) / 2;
-          }
-
-          ctx.drawImage(userImg, dx, dy, drawW, drawH);
-          ctx.restore();
-          finishAndSave();
-        };
-
-        userImg.onerror = () => {
-          finishAndSave();
-        };
-      } else {
-        finishAndSave();
-      }
-    };
-
-    bgImg.onerror = () => {
+      toast.success("Poster generated and downloaded successfully!");
+    } catch (err) {
+      console.error("Poster download error:", err);
+      toast.error("Failed to generate poster. Please try again.");
+    } finally {
       setIsDownloading(false);
-      toast.error("Failed to load poster background image");
-    };
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#F4F7FC] py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto space-y-8">
-        {/* Header Title */}
+      <div className="max-w-6xl mx-auto space-y-8">
+        {/* Page Header */}
         <div className="text-center space-y-3">
-          <span className="inline-block px-3 py-1 rounded-full text-xs font-bold tracking-wider bg-[#F59E0B]/20 text-[#1A284A] border border-[#F59E0B]/30 uppercase">
-            Pedago Milestone Posters
-          </span>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-[#1A284A] tracking-tight">
-            Create Your Personalized Achievement Poster
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold tracking-wider bg-amber-100 text-amber-900 border border-amber-200 shadow-2xs uppercase">
+            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+            <span>সরাসরি সোশ্যাল মিডিয়া পোস্টার তৈরি ও ডাউনলোড</span>
+          </div>
+
+          <h1 className="text-3xl sm:text-5xl font-black text-[#1A284A] tracking-tight">
+            Create Your Milestone Achievement Poster
           </h1>
-          <p className="text-gray-600 text-sm sm:text-base max-w-xl mx-auto">
-            Search by your Reference ID or Phone Number (matches last 6 digits), select your competition or category, upload your portrait picture, and download your personalized high-resolution social media poster.
+
+          <p className="text-gray-600 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
+            কোনো ভেরিফিকেশন বা রেজিস্ট্রেশন কোড ছাড়াই আপনার সুন্দর ছবি আপলোড করুন,
+            পছন্দমতো <strong>সার্কেল, রাউন্ডেড স্কয়ার বা আয়তাকার</strong> ফ্রেমে গ্রিড এডজাস্ট করুন এবং
+            এক ক্লিকে সোশ্যাল মিডিয়ায় শেয়ারের উপযোগী হাই-রেজোলিউশন পোস্টার ডাউনলোড করুন!
           </p>
         </div>
 
-        {/* Search Card */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200/80">
-          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Enter Reference Code (e.g. COMP-001) or Phone (e.g. 01712345678 or last 6 digits)..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#29479B] focus:border-transparent text-sm"
-              />
-            </div>
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={isSearching}
-              className="gap-2 px-6 py-3 shrink-0 bg-[#29479B] hover:bg-[#1A284A] text-white"
-            >
-              {isSearching ? <Spinner size="sm" /> : <Search className="w-4 h-4" />}
-              <span>Find My Poster</span>
-            </Button>
-          </form>
-          <div className="flex items-center gap-2 mt-2.5 text-xs text-gray-400">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-            <span>
-              Tip: Enter your phone number (matches last 6 digits). If you joined multiple categories, all your records will appear.
-            </span>
-          </div>
-        </div>
-
-        {/* Multi-Result Poster Selector (When multiple registrations found) */}
-        {resultsList.length > 1 && (
-          <div className="bg-gradient-to-br from-amber-50/70 via-white to-purple-50/50 p-6 rounded-2xl border border-amber-200/70 shadow-sm space-y-4">
-            <div className="flex items-center gap-2.5 pb-3 border-b border-amber-100">
-              <div className="w-10 h-10 rounded-xl bg-[#F59E0B] text-white flex items-center justify-center shadow-xs">
-                <Layers className="w-5 h-5" />
+        {/* Step 1: Template Selection (If multiple templates exist) */}
+        {templates.length > 1 && (
+          <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs space-y-4">
+            <div className="flex items-center gap-2.5 pb-2 border-b border-gray-100">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#29479B] flex items-center justify-center font-bold text-sm">
+                1
               </div>
               <div>
-                <h3 className="text-base font-extrabold text-[#1A284A] flex items-center gap-2">
-                  Found {resultsList.length} Registrations
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold">
-                    Multi-Category / Multi-Competition
-                  </span>
+                <h3 className="text-sm font-extrabold text-[#1A284A]">
+                  Choose Poster Artwork / Competition
                 </h3>
                 <p className="text-xs text-gray-500">
-                  Select which category or competition you want to generate the poster for:
+                  Select which competition or event design you want to create your poster with
                 </p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {resultsList.map((resItem, idx) => {
-                const isSelected = idx === selectedIndex;
-                const p = resItem.participant;
-                const hasTemplate = !!resItem.posterTemplate;
-
+              {templates.map((tmpl, idx) => {
+                const isSelected = idx === selectedTemplateIndex;
                 return (
-                  <div
-                    key={p._id || idx}
-                    onClick={() => setSelectedIndex(idx)}
-                    className={`p-4 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between text-left ${
+                  <button
+                    key={tmpl._id || idx}
+                    type="button"
+                    onClick={() => handleSelectTemplate(idx)}
+                    className={`p-3.5 rounded-xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
                       isSelected
-                        ? "bg-white border-[#F59E0B] ring-2 ring-[#F59E0B]/30 shadow-md scale-[1.01]"
-                        : "bg-white/70 hover:bg-white border-gray-200 hover:border-amber-300 hover:shadow-xs"
+                        ? "border-[#29479B] ring-2 ring-[#29479B]/20 bg-blue-50/50 shadow-xs"
+                        : "border-gray-200 hover:border-gray-300 bg-white"
                     }`}
                   >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
-                          <Tag className="w-3 h-3 mr-1" />
-                          {p.category || "General"}
-                        </span>
-                        <Badge
-                          variant={p.achievementType === "winner" ? "warning" : "info"}
-                          className="text-[10px] capitalize font-bold"
-                        >
-                          {p.achievementType}
-                        </Badge>
-                      </div>
-
-                      <h4 className="font-bold text-sm text-[#1A284A] line-clamp-1">
-                        {p.competition?.name || "Competition"}
-                      </h4>
-
-                      <div className="flex items-center justify-between text-xs text-gray-500 pt-1 border-t border-gray-100">
-                        <span className="font-mono font-bold text-gray-700">
-                          {p.refNumber}
-                        </span>
-                        {hasTemplate ? (
-                          <span className="text-emerald-600 font-semibold text-[11px] flex items-center gap-1">
-                            <Check className="w-3 h-3" /> Poster Ready
-                          </span>
-                        ) : (
-                          <span className="text-amber-600 font-semibold text-[11px]">
-                            In Prep
-                          </span>
-                        )}
-                      </div>
+                    <div className="w-12 h-14 rounded-lg bg-gray-100 overflow-hidden border border-gray-200 shrink-0">
+                      <img
+                        src={tmpl.backgroundImageUrl}
+                        alt="Thumbnail"
+                        className="w-full h-full object-cover"
+                        crossOrigin="anonymous"
+                      />
                     </div>
-
-                    <div className="mt-3 pt-2 flex items-center justify-between">
-                      <span
-                        className={`text-xs font-bold ${
-                          isSelected ? "text-amber-600" : "text-gray-400"
-                        }`}
-                      >
-                        {isSelected ? "● Currently Selected" : "Click to select"}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs font-bold text-[#1A284A] truncate">
+                        {tmpl.competitionId?.name || "Milestone Poster"}
+                      </h4>
+                      <span className="text-[11px] text-gray-500 capitalize block mt-0.5">
+                        {tmpl.type} Edition
                       </span>
                     </div>
-                  </div>
+                    {isSelected && (
+                      <Check className="w-4 h-4 text-[#29479B] shrink-0" />
+                    )}
+                  </button>
                 );
               })}
             </div>
           </div>
         )}
 
-        {/* Participant & Poster Result */}
-        {participantData && (
-          <div className="space-y-6">
-            {/* Participant Banner Card */}
-            <div className="bg-gradient-to-r from-[#1A284A] to-[#29479B] text-white p-6 rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-white/10 border-2 border-white/20 flex items-center justify-center shrink-0">
-                  <User className="w-7 h-7 text-white" />
+        {/* Main 2-Column Studio Grid: Left Controls, Right Live Preview */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Left Column: Image Upload, Grid Cropper, Shape Selection & Details */}
+          <div className="lg:col-span-7 space-y-6">
+            {/* Step 2: Upload Photo Card */}
+            <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold text-sm">
+                    {templates.length > 1 ? "2" : "1"}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-[#1A284A]">
+                      Upload Portrait Photo
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Upload your portrait picture (.png, .jpg, .jpeg) directly from your device
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-2xl font-black">{participantData.name}</h2>
-                    <Badge
-                      variant={participantData.achievementType === "winner" ? "warning" : "info"}
-                      className="capitalize font-bold text-xs"
-                    >
-                      <Award className="w-3.5 h-3.5 mr-1" />
-                      {participantData.achievementType}
-                    </Badge>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-white/20 text-white">
-                      Category: {participantData.category || "General"}
+
+                {uploadedImageSrc && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-xs font-bold text-[#29479B] hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw className="w-3 h-3" /> Change Photo
+                  </button>
+                )}
+              </div>
+
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+
+              {!uploadedImageSrc ? (
+                /* Drag & Drop Upload Zone */
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-gray-300 hover:border-[#29479B] bg-gray-50/50 hover:bg-blue-50/30 p-8 rounded-2xl text-center cursor-pointer transition-all space-y-3 group"
+                >
+                  <div className="w-14 h-14 rounded-2xl bg-white border border-gray-200 text-[#29479B] group-hover:scale-110 flex items-center justify-center mx-auto shadow-xs transition-transform">
+                    <UploadCloud className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-bold text-[#1A284A] block">
+                      Click to upload or drag & drop portrait photo
+                    </span>
+                    <span className="text-xs text-gray-400 mt-1 block">
+                      Supports JPG, PNG, WEBP high resolution images
                     </span>
                   </div>
-                  <p className="text-xs text-blue-200 mt-1">
-                    Competition:{" "}
-                    <strong className="text-white">
-                      {participantData.competition?.name || "National Competition"}
-                    </strong>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 pointer-events-none text-xs"
+                  >
+                    <ImageIcon className="w-3.5 h-3.5" />
+                    <span>Browse Device Files</span>
+                  </Button>
+                </div>
+              ) : (
+                /* Uploaded Photo Notification */
+                <div className="flex items-center justify-between p-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                  <div className="flex items-center gap-2.5">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    <div>
+                      <span className="text-xs font-bold text-emerald-900 block">
+                        Photo Loaded Successfully
+                      </span>
+                      <span className="text-[11px] text-emerald-700">
+                        Use the interactive grid below to adjust position and frame shape
+                      </span>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-emerald-300 text-emerald-800 bg-white hover:bg-emerald-100"
+                  >
+                    Upload Another
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Step 3: Interactive Grid Cropper & Frame Shape Selector */}
+            {uploadedImageSrc && (
+              <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs space-y-4">
+                <div className="flex items-center gap-2.5 pb-2 border-b border-gray-100">
+                  <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center font-bold text-sm">
+                    {templates.length > 1 ? "3" : "2"}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-[#1A284A]">
+                      Fix Selected Portion & Frame Shape
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Drag inside the grid to position your face and choose Circle, Rounded Square, or Rectangle
+                    </p>
+                  </div>
+                </div>
+
+                <PosterPhotoCropper
+                  imageSrc={uploadedImageSrc}
+                  frameShape={frameShape}
+                  onFrameShapeChange={setFrameShape}
+                  crop={crop}
+                  onCropChange={setCrop}
+                  zoom={zoom}
+                  onZoomChange={setZoom}
+                  rotation={rotation}
+                  onRotationChange={setRotation}
+                  onCropComplete={handleCropComplete}
+                />
+              </div>
+            )}
+
+            {/* Step 4: Optional Personalization (Name on Poster) */}
+            <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs space-y-4">
+              <div className="flex items-center gap-2.5 pb-2 border-b border-gray-100">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-sm">
+                  {templates.length > 1 ? "4" : "3"}
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-[#1A284A]">
+                    Personalize Name on Poster
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Type your full name as you would like it to appear on the official poster
                   </p>
                 </div>
               </div>
 
-              <div className="bg-white/10 p-3 rounded-xl border border-white/15 text-right sm:text-right shrink-0">
-                <span className="text-[10px] uppercase font-bold text-blue-200 block">
-                  Reference Code
-                </span>
-                <span className="font-mono text-base font-extrabold text-white">
-                  {participantData.refNumber}
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1.5">
+                  Your Full Name (পোস্টারে প্রদর্শনের নাম)
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={userName}
+                    onChange={(e) => setUserName(e.target.value)}
+                    placeholder="e.g. Md. Nur Alam / নূরে আলম"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#29479B] focus:border-transparent text-sm"
+                  />
+                </div>
+                <span className="text-[11px] text-gray-400 mt-1 block">
+                  The name is rendered directly onto the poster with the official font and drop-shadow.
                 </span>
               </div>
             </div>
-
-            {/* Poster Template Section */}
-            {posterTemplate ? (
-              <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200/80 space-y-6">
-                {/* PHOTO UPLOAD CUSTOMIZATION SECTION */}
-                <div className="bg-amber-50/50 p-5 rounded-xl border border-amber-200/70 space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div>
-                      <h3 className="font-bold text-sm text-[#1A284A] flex items-center gap-2">
-                        <UploadCloud className="w-4 h-4 text-[#F59E0B]" />
-                        Upload Your Photo for the Poster
-                      </h3>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Upload your clear portrait photo to fit into the poster's cutout shape ({photoZone.shape || "circle"}).
-                      </p>
-                    </div>
-                    {isUpdatingPhoto && (
-                      <span className="text-xs text-amber-700 font-semibold flex items-center gap-1">
-                        <Spinner size="xs" /> Updating record...
-                      </span>
-                    )}
-                  </div>
-
-                  <ImageUpload
-                    value={userPhoto}
-                    onChange={handlePhotoChange}
-                    placeholder="Upload portrait photo (.png, .jpg) or paste image URL"
-                    helpText="Auto-hosted permanently on ImgBB. Your photo will render directly in the preview below."
-                  />
-                </div>
-
-                {/* Live Render Canvas */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span className="font-bold text-gray-700 flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-amber-500" />
-                      Live Poster Preview ({participantData.category || "General"})
-                    </span>
-                    <span>Format: Portrait Social Media</span>
-                  </div>
-
-                  <div
-                    ref={containerRef}
-                    className="relative w-full rounded-xl overflow-hidden border-2 border-gray-200 shadow-md bg-white select-none max-w-md mx-auto"
-                    style={{ aspectRatio: "3 / 4" }}
-                  >
-                    {/* Background Poster Artwork */}
-                    {posterTemplate.backgroundImageUrl && (
-                      <img
-                        src={posterTemplate.backgroundImageUrl}
-                        alt="Poster Background"
-                        className="w-full h-full object-cover pointer-events-none"
-                        crossOrigin="anonymous"
-                      />
-                    )}
-
-                    {/* Rendered User Photo Cutout */}
-                    <div
-                      className={`absolute overflow-hidden border-2 border-white/80 shadow-md ${photoShapeClass}`}
-                      style={{
-                        left: `${photoZone.x}%`,
-                        top: `${photoZone.y}%`,
-                        width: `${photoWidthPercent}%`,
-                        aspectRatio: "1 / 1",
-                        transform: "translate(-50%, -50%)",
-                        zIndex: 20,
-                        backgroundColor: "#E2E8F0",
-                      }}
-                    >
-                      {userPhoto ? (
-                        <img
-                          src={userPhoto}
-                          alt={participantData.name}
-                          className="w-full h-full object-cover"
-                          crossOrigin="anonymous"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400">
-                          <User className="w-8 h-8" />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Rendered Name */}
-                    <div
-                      className="absolute select-none pointer-events-none"
-                      style={{
-                        left: `${nameZone.x}%`,
-                        top: `${nameZone.y}%`,
-                        transform: getTransform(nameZone.align),
-                        fontFamily: nameZone.font || "Montserrat",
-                        fontSize: `${scaleFont(nameZone.size)}px`,
-                        color: nameZone.color || "#FFFFFF",
-                        textAlign: nameZone.align || "center",
-                        whiteSpace: "nowrap",
-                        lineHeight: 1.2,
-                        textShadow: "0 2px 4px rgba(0,0,0,0.6)",
-                        zIndex: 25,
-                      }}
-                    >
-                      {participantData.name}
-                    </div>
-
-                    {/* Rendered Ref Number */}
-                    <div
-                      className="absolute select-none pointer-events-none"
-                      style={{
-                        left: `${refZone.x}%`,
-                        top: `${refZone.y}%`,
-                        transform: getTransform(refZone.align),
-                        fontFamily: refZone.font || "Montserrat",
-                        fontSize: `${scaleFont(refZone.size)}px`,
-                        color: refZone.color || "#F59E0B",
-                        textAlign: refZone.align || "center",
-                        whiteSpace: "nowrap",
-                        lineHeight: 1.2,
-                        textShadow: "0 2px 4px rgba(0,0,0,0.6)",
-                        zIndex: 25,
-                      }}
-                    >
-                      {participantData.refNumber}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Download Button */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-100">
-                  <div className="text-xs text-gray-500">
-                    Downloaded <strong>{participantData.posterDownloadCount || 0} times</strong> previously.
-                  </div>
-
-                  <Button
-                    type="button"
-                    variant="primary"
-                    size="lg"
-                    onClick={handleDownloadPoster}
-                    disabled={isDownloading}
-                    className="w-full sm:w-auto gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg transition-all"
-                  >
-                    {isDownloading ? (
-                      <>
-                        <Spinner size="sm" /> Generating Poster...
-                      </>
-                    ) : (
-                      <>
-                        <Download className="w-5 h-5" /> Download High-Res Poster (.PNG)
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-white p-8 rounded-2xl border border-gray-200 text-center space-y-3">
-                <AlertCircle className="w-10 h-10 text-amber-500 mx-auto" />
-                <h3 className="font-bold text-gray-800">Poster Template in Preparation</h3>
-                <p className="text-sm text-gray-500 max-w-md mx-auto">
-                  The official poster artwork for <strong>{participantData.competition?.name}</strong> ({participantData.category || "General"}) is currently being uploaded by the administration. Please check back shortly!
-                </p>
-              </div>
-            )}
           </div>
-        )}
+
+          {/* Right Column: Live Poster Preview & Instant High-Res Download */}
+          <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-8">
+            <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-[#29479B]" />
+                  <h3 className="text-sm font-extrabold text-[#1A284A]">
+                    Live Poster Preview
+                  </h3>
+                </div>
+                <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full capitalize">
+                  {frameShape} Cutout
+                </span>
+              </div>
+
+              {/* Responsive Live Canvas Container */}
+              <div
+                ref={containerRef}
+                className="relative w-full rounded-2xl overflow-hidden border-2 border-gray-200 shadow-lg bg-slate-900 select-none mx-auto max-w-sm"
+                style={{ aspectRatio: "3 / 4" }}
+              >
+                {/* Poster Background Artwork */}
+                {activeTemplate.backgroundImageUrl && (
+                  <img
+                    src={activeTemplate.backgroundImageUrl}
+                    alt="Poster Background"
+                    className="w-full h-full object-cover pointer-events-none"
+                    crossOrigin="anonymous"
+                  />
+                )}
+
+                {/* Framed Photo Cutout */}
+                <div
+                  className={`absolute overflow-hidden border-2 border-white shadow-xl transition-all ${frameClass}`}
+                  style={{
+                    left: `${photoZone.x}%`,
+                    top: `${photoZone.y}%`,
+                    width: `${photoWidthPercent}%`,
+                    aspectRatio: isRectangle ? "3 / 4" : "1 / 1",
+                    transform: "translate(-50%, -50%)",
+                    zIndex: 20,
+                    backgroundColor: "#1E293B",
+                  }}
+                >
+                  {croppedPreviewUrl ? (
+                    <img
+                      src={croppedPreviewUrl}
+                      alt="User Preview"
+                      className="w-full h-full object-cover pointer-events-none"
+                      crossOrigin="anonymous"
+                    />
+                  ) : uploadedImageSrc ? (
+                    <img
+                      src={uploadedImageSrc}
+                      alt="User Raw Preview"
+                      className="w-full h-full object-cover pointer-events-none"
+                      crossOrigin="anonymous"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 p-2 text-center">
+                      <User className="w-8 h-8 mb-1 opacity-60" />
+                      <span className="text-[10px] font-semibold">
+                        Upload Photo
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Rendered Name Text */}
+                {userName.trim() && (
+                  <div
+                    className="absolute select-none pointer-events-none"
+                    style={{
+                      left: `${nameZone.x}%`,
+                      top: `${nameZone.y}%`,
+                      transform: "translate(-50%, -50%)",
+                      fontFamily: nameZone.font || "Montserrat",
+                      fontSize: `${scaleFont(nameZone.size)}px`,
+                      color: nameZone.color || "#FFFFFF",
+                      textAlign: nameZone.align || "center",
+                      whiteSpace: "nowrap",
+                      fontWeight: "bold",
+                      lineHeight: 1.2,
+                      textShadow: "0 2px 8px rgba(0,0,0,0.8)",
+                      zIndex: 25,
+                    }}
+                  >
+                    {userName.trim()}
+                  </div>
+                )}
+              </div>
+
+              {/* Live Info & Format Details */}
+              <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-200 text-xs text-gray-500 space-y-1">
+                <div className="flex justify-between">
+                  <span>Target Artwork:</span>
+                  <strong className="text-gray-800">
+                    {activeTemplate.competitionId?.name || "Official Milestone"}
+                  </strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Photo Frame:</span>
+                  <strong className="text-gray-800 capitalize">
+                    {frameShape}
+                  </strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Output Resolution:</span>
+                  <strong className="text-emerald-700">
+                    Full High-Res (.PNG)
+                  </strong>
+                </div>
+              </div>
+
+              {/* Final Download Button */}
+              <Button
+                type="button"
+                variant="primary"
+                size="lg"
+                onClick={handleDownload}
+                disabled={isDownloading}
+                className="w-full py-4 text-base font-bold gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg transition-all cursor-pointer"
+              >
+                {isDownloading ? (
+                  <>
+                    <Spinner size="sm" />
+                    <span>Generating High-Res Poster...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-5 h-5" />
+                    <span>Download Poster (.PNG)</span>
+                  </>
+                )}
+              </Button>
+
+              <p className="text-[11px] text-gray-400 text-center">
+                Ready for instant sharing on Facebook, Instagram, LinkedIn & WhatsApp.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
