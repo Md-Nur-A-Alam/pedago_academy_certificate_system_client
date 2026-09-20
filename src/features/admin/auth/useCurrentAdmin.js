@@ -43,6 +43,21 @@ export function useCurrentAdmin() {
     },
   });
 
+  const updateProfileMutation = useMutation({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.patch("/api/admins/me", payload);
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(data.message || "Profile updated successfully");
+      queryClient.invalidateQueries({ queryKey: ["current-admin"] });
+    },
+    onError: (err) => {
+      const msg = err.response?.data?.message || err.message || "Failed to update profile";
+      toast.error(msg);
+    },
+  });
+
   const admin = currentAdminQuery.data || null;
 
   return {
@@ -52,6 +67,8 @@ export function useCurrentAdmin() {
     error: currentAdminQuery.error,
     isSuperAdmin: admin?.role === "super_admin",
     mustChangePassword: Boolean(admin?.mustChangePassword),
+    updateProfile: updateProfileMutation.mutateAsync,
+    isUpdatingProfile: updateProfileMutation.isPending,
     changePassword: changePasswordMutation.mutateAsync,
     isChangingPassword: changePasswordMutation.isPending,
     refetchAdmin: currentAdminQuery.refetch,

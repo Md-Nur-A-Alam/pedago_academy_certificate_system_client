@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { LogOut, KeyRound, ShieldCheck, User } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { useCurrentAdmin } from "@/features/admin/auth/useCurrentAdmin";
@@ -39,14 +40,27 @@ export function AdminTopbar() {
         </div>
 
         <div className="flex items-center gap-3.5">
-          {/* Admin Identity Info */}
+          {/* Admin Identity Info & Profile Link */}
           {admin && (
-            <div className="flex items-center gap-3 pr-3 border-r border-gray-200">
-              <div className="w-8 h-8 rounded-full bg-[#1A284A]/5 border border-[#1A284A]/10 flex items-center justify-center text-[#1A284A]">
-                <User className="w-4 h-4" />
+            <Link
+              href="/admin/settings"
+              className="flex items-center gap-3 pr-3 border-r border-gray-200 hover:opacity-90 transition-opacity group cursor-pointer"
+              title="Click to view and edit your profile in Settings"
+            >
+              <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200 bg-[#1A284A]/5 flex items-center justify-center text-[#1A284A] shrink-0">
+                {admin.photo ? (
+                  <img
+                    src={admin.photo}
+                    alt={admin.name}
+                    className="w-full h-full object-cover"
+                    crossOrigin="anonymous"
+                  />
+                ) : (
+                  <User className="w-4 h-4" />
+                )}
               </div>
               <div className="hidden sm:block text-left">
-                <div className="text-xs font-bold text-[#1A284A] leading-tight flex items-center gap-1.5">
+                <div className="text-xs font-bold text-[#1A284A] leading-tight flex items-center gap-1.5 group-hover:text-[#29479B] transition-colors">
                   {admin.name}
                   <span
                     className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 ${
@@ -56,14 +70,14 @@ export function AdminTopbar() {
                     }`}
                   >
                     <ShieldCheck className="w-2.5 h-2.5" />
-                    {isSuperAdmin ? "Super Admin" : "Admin"}
+                    {admin.officeRole || (isSuperAdmin ? "Super Admin" : "Admin")}
                   </span>
                 </div>
                 <div className="text-[11px] text-gray-500 font-medium leading-none mt-0.5">
                   {admin.email}
                 </div>
               </div>
-            </div>
+            </Link>
           )}
 
           {/* Change Password Trigger */}

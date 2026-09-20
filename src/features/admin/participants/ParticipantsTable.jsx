@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Edit, Trash2, Search, FileSpreadsheet, ExternalLink, Image as ImageIcon } from "lucide-react";
+import { Plus, Edit, Trash2, Search, FileSpreadsheet, ExternalLink, Image as ImageIcon, Eye } from "lucide-react";
 import { useParticipants } from "./useParticipants";
 import { useCompetitions } from "../competitions/useCompetitions";
 import { Badge } from "@/components/ui/Badge";
@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Modal } from "@/components/ui/Modal";
 import { ParticipantForm } from "./ParticipantForm";
 import { BulkImportModal } from "./BulkImportModal";
+import { ParticipantDetailsModal } from "./ParticipantDetailsModal";
 
 export function ParticipantsTable() {
   const [search, setSearch] = useState("");
@@ -21,6 +22,7 @@ export function ParticipantsTable() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [editingParticipant, setEditingParticipant] = useState(null);
+  const [viewingParticipant, setViewingParticipant] = useState(null);
 
   const { competitions } = useCompetitions();
   const {
@@ -167,7 +169,16 @@ export function ParticipantsTable() {
                     <td className="px-6 py-4 font-mono text-xs font-bold text-[#29479B]">
                       {p.refNumber}
                     </td>
-                    <td className="px-6 py-4 font-semibold text-[#1A284A]">{p.name}</td>
+                    <td className="px-6 py-4">
+                      <button
+                        type="button"
+                        onClick={() => setViewingParticipant(p)}
+                        className="font-semibold text-[#1A284A] hover:text-[#29479B] hover:underline text-left cursor-pointer transition-colors block"
+                        title="Click to view details and preview source post"
+                      >
+                        {p.name}
+                      </button>
+                    </td>
                     <td className="px-6 py-4">
                       <div className="font-mono text-xs text-gray-700">{p.phone}</div>
                       <div className="text-[11px] text-gray-400">Age: {p.age || "N/A"}</div>
@@ -214,6 +225,14 @@ export function ParticipantsTable() {
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
+                          type="button"
+                          onClick={() => setViewingParticipant(p)}
+                          className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                          title="View Details & Preview Source Post"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => handleOpenEdit(p)}
                           className="p-1.5 text-gray-500 hover:text-[#29479B] hover:bg-gray-100 rounded-md transition-colors"
                           title="Edit Participant"
@@ -237,6 +256,13 @@ export function ParticipantsTable() {
           </div>
         </div>
       )}
+
+      {/* Participant Details & Submission Preview Modal */}
+      <ParticipantDetailsModal
+        isOpen={Boolean(viewingParticipant)}
+        onClose={() => setViewingParticipant(null)}
+        participant={viewingParticipant}
+      />
 
       {/* Single Participant Modal */}
       <Modal

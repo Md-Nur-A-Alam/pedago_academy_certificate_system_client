@@ -1,88 +1,71 @@
 "use client";
 
-import { useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { useSystemSettings } from "@/hooks/useSystemSettings";
-import { Card } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
-import { Button } from "@/components/ui/Button";
-import { Spinner } from "@/components/ui/Spinner";
+import { useState } from "react";
+import { User, Palette, KeyRound } from "lucide-react";
+import { AdminProfileSettings } from "@/features/admin/settings/AdminProfileSettings";
+import { BrandingSettings } from "@/features/admin/settings/BrandingSettings";
+import { SecuritySettings } from "@/features/admin/settings/SecuritySettings";
 
 export default function AdminSettingsPage() {
-  const { settings, isLoading, updateSettings, isUpdating } = useSystemSettings();
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm({
-    defaultValues: {
-      heroBgUrl: "/HeroBG.jpg",
-      logoUrl: "/pedagoLogo.png",
-      siteTitle: "Pedago Academy",
-    },
-  });
-
-  useEffect(() => {
-    if (settings) {
-      reset({
-        heroBgUrl: settings.heroBgUrl || "/HeroBG.jpg",
-        logoUrl: settings.logoUrl || "/pedagoLogo.png",
-        siteTitle: settings.siteTitle || "Pedago Academy",
-      });
-    }
-  }, [settings, reset]);
-
-  const onSubmit = async (data) => {
-    await updateSettings(data);
-  };
-
-  if (isLoading) {
-    return (
-      <div className="py-16 flex justify-center">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
+  const [activeTab, setActiveTab] = useState("profile"); // 'profile' | 'branding' | 'security'
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-extrabold text-[#1A284A]">System & Theme Settings</h1>
-        <p className="text-sm text-gray-500 mt-1">Configure global background images, logo, and portal branding</p>
+        <h1 className="text-2xl font-extrabold text-[#1A284A]">Settings & Administration</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Manage your personal admin profile, portal branding, and security credentials
+        </p>
       </div>
 
-      <Card>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <Input
-            label="Hero Section Background Image URL / Path"
-            placeholder="/HeroBG.jpg or https://..."
-            error={errors.heroBgUrl?.message}
-            {...register("heroBgUrl")}
-          />
+      {/* Tabs Navigation */}
+      <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab("profile")}
+          className={`px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
+            activeTab === "profile"
+              ? "bg-[#29479B] text-white shadow-xs"
+              : "text-gray-600 hover:text-[#1A284A] hover:bg-gray-100"
+          }`}
+        >
+          <User className="w-4 h-4" />
+          <span>My Profile</span>
+        </button>
 
-          <Input
-            label="Logo Image URL / Path"
-            placeholder="/pedagoLogo.png or https://..."
-            error={errors.logoUrl?.message}
-            {...register("logoUrl")}
-          />
+        <button
+          type="button"
+          onClick={() => setActiveTab("branding")}
+          className={`px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
+            activeTab === "branding"
+              ? "bg-[#29479B] text-white shadow-xs"
+              : "text-gray-600 hover:text-[#1A284A] hover:bg-gray-100"
+          }`}
+        >
+          <Palette className="w-4 h-4" />
+          <span>System & Branding</span>
+        </button>
 
-          <Input
-            label="Portal Title"
-            placeholder="Pedago Academy"
-            error={errors.siteTitle?.message}
-            {...register("siteTitle")}
-          />
+        <button
+          type="button"
+          onClick={() => setActiveTab("security")}
+          className={`px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
+            activeTab === "security"
+              ? "bg-[#29479B] text-white shadow-xs"
+              : "text-gray-600 hover:text-[#1A284A] hover:bg-gray-100"
+          }`}
+        >
+          <KeyRound className="w-4 h-4" />
+          <span>Security & Password</span>
+        </button>
+      </div>
 
-          <div className="pt-4 border-t border-gray-100 flex justify-end">
-            <Button type="submit" variant="primary" disabled={isUpdating}>
-              {isUpdating ? "Saving Settings..." : "Save Settings"}
-            </Button>
-          </div>
-        </form>
-      </Card>
+      {/* Tab Content */}
+      <div className="pt-2">
+        {activeTab === "profile" && <AdminProfileSettings />}
+        {activeTab === "branding" && <BrandingSettings />}
+        {activeTab === "security" && <SecuritySettings />}
+      </div>
     </div>
   );
 }

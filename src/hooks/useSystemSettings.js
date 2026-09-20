@@ -36,7 +36,14 @@ export function useSystemSettings() {
   });
 
   return {
-    settings: settingsQuery.data || { heroBgUrl: "/HeroBG.jpg", logoUrl: "/pedagoLogo.png", siteTitle: "Pedago Academy" },
+    settings: settingsQuery.data || {
+      heroBgUrl: "/HeroBG.jpg",
+      logoUrl: "/pedagoLogo.png",
+      siteTitle: "Pedago Academy",
+      contactEmail: "support@pedago.academy",
+      contactPhone: "+880 1700-000000",
+      footerText: "Pedago Academy - Official Certificate & Poster Verification Portal",
+    },
     isLoading: settingsQuery.isLoading,
     isError: settingsQuery.isError,
     error: settingsQuery.error,
