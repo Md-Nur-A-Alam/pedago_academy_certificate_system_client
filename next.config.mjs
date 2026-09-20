@@ -7,6 +7,16 @@ const nextConfig = {
         hostname: 'pedagoacademy.com',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'i.ibb.co',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'ibb.co',
+        pathname: '/**',
+      },
     ],
   },
   async rewrites() {
