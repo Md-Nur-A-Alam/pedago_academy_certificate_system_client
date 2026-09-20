@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { parseStyleBooleans } from "@/lib/fontConstants";
 
 const DEFAULT_SAMPLE_PHOTO =
   "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80";
@@ -300,19 +301,26 @@ export function PosterCanvasPointPicker({
                 </div>
               )}
 
-              <div
-                style={{
-                  fontFamily: nameZone.font || "Montserrat",
-                  fontSize: `${scaleFont(nameZone.size)}px`,
-                  color: nameZone.color || "#FFFFFF",
-                  textAlign: nameZone.align || "center",
-                  whiteSpace: "nowrap",
-                  lineHeight: 1.2,
-                  textShadow: "0 2px 4px rgba(0,0,0,0.5)",
-                }}
-              >
-                {previewName}
-              </div>
+              {(() => {
+                const { isBold, isItalic } = parseStyleBooleans(nameZone.style);
+                return (
+                  <div
+                    style={{
+                      fontFamily: nameZone.font || "Montserrat",
+                      fontSize: `${scaleFont(nameZone.size)}px`,
+                      fontWeight: isBold ? "bold" : "normal",
+                      fontStyle: isItalic ? "italic" : "normal",
+                      color: nameZone.color || "#FFFFFF",
+                      textAlign: nameZone.align || "center",
+                      whiteSpace: "nowrap",
+                      lineHeight: 1.2,
+                      textShadow: "0 2px 4px rgba(0,0,0,0.5)",
+                    }}
+                  >
+                    {previewName}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* REFERENCE CODE ZONE OVERLAY */}
@@ -337,19 +345,26 @@ export function PosterCanvasPointPicker({
                 </div>
               )}
 
-              <div
-                style={{
-                  fontFamily: refZone.font || "Montserrat",
-                  fontSize: `${scaleFont(refZone.size)}px`,
-                  color: refZone.color || "#F59E0B",
-                  textAlign: refZone.align || "center",
-                  whiteSpace: "nowrap",
-                  lineHeight: 1.2,
-                  textShadow: "0 2px 4px rgba(0,0,0,0.5)",
-                }}
-              >
-                {previewRef}
-              </div>
+              {(() => {
+                const { isBold, isItalic } = parseStyleBooleans(refZone.style);
+                return (
+                  <div
+                    style={{
+                      fontFamily: refZone.font || "Montserrat",
+                      fontSize: `${scaleFont(refZone.size)}px`,
+                      fontWeight: isBold ? "bold" : "normal",
+                      fontStyle: isItalic ? "italic" : "normal",
+                      color: refZone.color || "#F59E0B",
+                      textAlign: refZone.align || "center",
+                      whiteSpace: "nowrap",
+                      lineHeight: 1.2,
+                      textShadow: "0 2px 4px rgba(0,0,0,0.5)",
+                    }}
+                  >
+                    {previewRef}
+                  </div>
+                );
+              })()}
             </div>
           </>
         )}

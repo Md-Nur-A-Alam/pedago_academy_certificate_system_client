@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
 import apiClient from "@/lib/api-client";
 import { toast } from "react-toastify";
+import { buildCanvasFont, parseStyleBooleans } from "@/lib/fontConstants";
 
 export default function CertificatesPage() {
   const [query, setQuery] = useState("");
@@ -159,7 +160,11 @@ export default function CertificatesPage() {
         // Draw Recipient Name
         if (participant?.name) {
           const nameSizePx = (nZ.size || 44) * (canvas.width / 1000) * 1.3;
-          ctx.font = `${nameSizePx}px "${nZ.font || "Great Vibes"}", cursive, sans-serif`;
+          ctx.font = buildCanvasFont({
+            font: nZ.font || "Great Vibes",
+            size: nameSizePx,
+            style: nZ.style || "normal",
+          });
           ctx.fillStyle = nZ.color || "#1A284A";
           ctx.textAlign = nZ.align || "center";
           ctx.textBaseline = "middle";
@@ -172,7 +177,11 @@ export default function CertificatesPage() {
         // Draw Reference Code
         if (participant?.refNumber) {
           const refSizePx = (rZ.size || 16) * (canvas.width / 1000) * 1.3;
-          ctx.font = `bold ${refSizePx}px "${rZ.font || "Montserrat"}", sans-serif`;
+          ctx.font = buildCanvasFont({
+            font: rZ.font || "Montserrat",
+            size: refSizePx,
+            style: rZ.style || "bold",
+          });
           ctx.fillStyle = rZ.color || "#29479B";
           ctx.textAlign = rZ.align || "center";
           ctx.textBaseline = "middle";
@@ -518,42 +527,56 @@ export default function CertificatesPage() {
                   )}
 
                   {/* Rendered Name */}
-                  <div
-                    className="absolute select-none pointer-events-none"
-                    style={{
-                      left: `${nameZone.x}%`,
-                      top: `${nameZone.y}%`,
-                      transform: getTransform(nameZone.align),
-                      fontFamily: nameZone.font || "Great Vibes",
-                      fontSize: `${scaleFont(nameZone.size)}px`,
-                      color: nameZone.color || "#1A284A",
-                      textAlign: nameZone.align || "center",
-                      whiteSpace: "nowrap",
-                      lineHeight: 1.2,
-                      zIndex: 25,
-                    }}
-                  >
-                    {participantData.name}
-                  </div>
+                  {(() => {
+                    const { isBold, isItalic } = parseStyleBooleans(nameZone.style);
+                    return (
+                      <div
+                        className="absolute select-none pointer-events-none"
+                        style={{
+                          left: `${nameZone.x}%`,
+                          top: `${nameZone.y}%`,
+                          transform: getTransform(nameZone.align),
+                          fontFamily: nameZone.font || "Great Vibes",
+                          fontSize: `${scaleFont(nameZone.size)}px`,
+                          fontWeight: isBold ? "bold" : "normal",
+                          fontStyle: isItalic ? "italic" : "normal",
+                          color: nameZone.color || "#1A284A",
+                          textAlign: nameZone.align || "center",
+                          whiteSpace: "nowrap",
+                          lineHeight: 1.2,
+                          zIndex: 25,
+                        }}
+                      >
+                        {participantData.name}
+                      </div>
+                    );
+                  })()}
 
                   {/* Rendered Reference Code */}
-                  <div
-                    className="absolute select-none pointer-events-none"
-                    style={{
-                      left: `${refZone.x}%`,
-                      top: `${refZone.y}%`,
-                      transform: getTransform(refZone.align),
-                      fontFamily: refZone.font || "Montserrat",
-                      fontSize: `${scaleFont(refZone.size)}px`,
-                      color: refZone.color || "#29479B",
-                      textAlign: refZone.align || "center",
-                      whiteSpace: "nowrap",
-                      lineHeight: 1.2,
-                      zIndex: 25,
-                    }}
-                  >
-                    {participantData.refNumber}
-                  </div>
+                  {(() => {
+                    const { isBold, isItalic } = parseStyleBooleans(refZone.style);
+                    return (
+                      <div
+                        className="absolute select-none pointer-events-none"
+                        style={{
+                          left: `${refZone.x}%`,
+                          top: `${refZone.y}%`,
+                          transform: getTransform(refZone.align),
+                          fontFamily: refZone.font || "Montserrat",
+                          fontSize: `${scaleFont(refZone.size)}px`,
+                          fontWeight: isBold ? "bold" : "normal",
+                          fontStyle: isItalic ? "italic" : "normal",
+                          color: refZone.color || "#29479B",
+                          textAlign: refZone.align || "center",
+                          whiteSpace: "nowrap",
+                          lineHeight: 1.2,
+                          zIndex: 25,
+                        }}
+                      >
+                        {participantData.refNumber}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Download Actions */}

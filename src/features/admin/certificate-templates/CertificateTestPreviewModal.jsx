@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { useCurrentAdmin } from "../auth/useCurrentAdmin";
+import { buildCanvasFont, parseStyleBooleans } from "@/lib/fontConstants";
 
 export function CertificateTestPreviewModal({ isOpen, onClose, template }) {
   const { admin } = useCurrentAdmin();
@@ -76,7 +77,11 @@ export function CertificateTestPreviewModal({ isOpen, onClose, template }) {
       // Render Name
       if (testName) {
         const nameSizePx = (nameZone.size || 42) * (canvas.width / 1000) * 1.3;
-        ctx.font = `${nameSizePx}px "${nameZone.font || "Great Vibes"}", cursive, serif`;
+        ctx.font = buildCanvasFont({
+          font: nameZone.font || "Great Vibes",
+          size: nameSizePx,
+          style: nameZone.style || "normal",
+        });
         ctx.fillStyle = nameZone.color || "#1A284A";
         ctx.textAlign = nameZone.align || "center";
         ctx.textBaseline = "middle";
@@ -89,7 +94,11 @@ export function CertificateTestPreviewModal({ isOpen, onClose, template }) {
       // Render Ref Code
       if (testRef) {
         const refSizePx = (refZone.size || 18) * (canvas.width / 1000) * 1.3;
-        ctx.font = `${refSizePx}px "${refZone.font || "Montserrat"}", sans-serif`;
+        ctx.font = buildCanvasFont({
+          font: refZone.font || "Montserrat",
+          size: refSizePx,
+          style: refZone.style || "normal",
+        });
         ctx.fillStyle = refZone.color || "#29479B";
         ctx.textAlign = refZone.align || "center";
         ctx.textBaseline = "middle";
@@ -173,42 +182,56 @@ export function CertificateTestPreviewModal({ isOpen, onClose, template }) {
             />
 
             {/* Rendered Name */}
-            <div
-              className="absolute select-none pointer-events-none"
-              style={{
-                left: `${nameZone.x}%`,
-                top: `${nameZone.y}%`,
-                transform: getTransform(nameZone.align),
-                fontFamily: nameZone.font || "Great Vibes",
-                fontSize: `${scaleFont(nameZone.size)}px`,
-                color: nameZone.color || "#1A284A",
-                textAlign: nameZone.align || "center",
-                whiteSpace: "nowrap",
-                lineHeight: 1.2,
-                zIndex: 20,
-              }}
-            >
-              {testName}
-            </div>
+            {(() => {
+              const { isBold, isItalic } = parseStyleBooleans(nameZone.style);
+              return (
+                <div
+                  className="absolute select-none pointer-events-none"
+                  style={{
+                    left: `${nameZone.x}%`,
+                    top: `${nameZone.y}%`,
+                    transform: getTransform(nameZone.align),
+                    fontFamily: nameZone.font || "Great Vibes",
+                    fontSize: `${scaleFont(nameZone.size)}px`,
+                    fontWeight: isBold ? "bold" : "normal",
+                    fontStyle: isItalic ? "italic" : "normal",
+                    color: nameZone.color || "#1A284A",
+                    textAlign: nameZone.align || "center",
+                    whiteSpace: "nowrap",
+                    lineHeight: 1.2,
+                    zIndex: 20,
+                  }}
+                >
+                  {testName}
+                </div>
+              );
+            })()}
 
             {/* Rendered Ref */}
-            <div
-              className="absolute select-none pointer-events-none"
-              style={{
-                left: `${refZone.x}%`,
-                top: `${refZone.y}%`,
-                transform: getTransform(refZone.align),
-                fontFamily: refZone.font || "Montserrat",
-                fontSize: `${scaleFont(refZone.size)}px`,
-                color: refZone.color || "#29479B",
-                textAlign: refZone.align || "center",
-                whiteSpace: "nowrap",
-                lineHeight: 1.2,
-                zIndex: 20,
-              }}
-            >
-              {testRef}
-            </div>
+            {(() => {
+              const { isBold, isItalic } = parseStyleBooleans(refZone.style);
+              return (
+                <div
+                  className="absolute select-none pointer-events-none"
+                  style={{
+                    left: `${refZone.x}%`,
+                    top: `${refZone.y}%`,
+                    transform: getTransform(refZone.align),
+                    fontFamily: refZone.font || "Montserrat",
+                    fontSize: `${scaleFont(refZone.size)}px`,
+                    fontWeight: isBold ? "bold" : "normal",
+                    fontStyle: isItalic ? "italic" : "normal",
+                    color: refZone.color || "#29479B",
+                    textAlign: refZone.align || "center",
+                    whiteSpace: "nowrap",
+                    lineHeight: 1.2,
+                    zIndex: 20,
+                  }}
+                >
+                  {testRef}
+                </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -219,7 +242,7 @@ export function CertificateTestPreviewModal({ isOpen, onClose, template }) {
             <span className="text-gray-500">
               X: <strong className="text-gray-700">{nameZone.x}%</strong>, Y:{" "}
               <strong className="text-gray-700">{nameZone.y}%</strong> | Font:{" "}
-              <strong className="text-gray-700">{nameZone.font}</strong> ({nameZone.size}pt) | Color:{" "}
+              <strong className="text-gray-700">{nameZone.font}</strong> ({nameZone.size}pt, {nameZone.style || "normal"}) | Color:{" "}
               <strong style={{ color: nameZone.color }}>{nameZone.color}</strong>
             </span>
           </div>
@@ -228,7 +251,7 @@ export function CertificateTestPreviewModal({ isOpen, onClose, template }) {
             <span className="text-gray-500">
               X: <strong className="text-gray-700">{refZone.x}%</strong>, Y:{" "}
               <strong className="text-gray-700">{refZone.y}%</strong> | Font:{" "}
-              <strong className="text-gray-700">{refZone.font}</strong> ({refZone.size}pt) | Color:{" "}
+              <strong className="text-gray-700">{refZone.font}</strong> ({refZone.size}pt, {refZone.style || "normal"}) | Color:{" "}
               <strong style={{ color: refZone.color }}>{refZone.color}</strong>
             </span>
           </div>

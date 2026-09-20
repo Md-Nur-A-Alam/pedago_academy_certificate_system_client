@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Save, Sparkles, Target, Sliders, Image as ImageIcon } from "lucide-react";
+import {
+  ArrowLeft,
+  Save,
+  Sparkles,
+  Target,
+  Sliders,
+  Image as ImageIcon,
+  Bold,
+  Italic,
+} from "lucide-react";
 import { useCompetitions } from "../competitions/useCompetitions";
 import { usePosterTemplates } from "./usePosterTemplates";
 import { useCurrentAdmin } from "../auth/useCurrentAdmin";
@@ -14,16 +23,11 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
 import { toast } from "react-toastify";
-
-const FONT_OPTIONS = [
-  { label: "Montserrat (Sans-serif)", value: "Montserrat" },
-  { label: "Raleway (Sans-serif)", value: "Raleway" },
-  { label: "Roboto (Sans-serif)", value: "Roboto" },
-  { label: "Open Sans (Sans-serif)", value: "Open Sans" },
-  { label: "Playfair Display (Serif)", value: "Playfair Display" },
-  { label: "Cinzel (Serif)", value: "Cinzel" },
-  { label: "Great Vibes (Script)", value: "Great Vibes" },
-];
+import {
+  FONT_OPTIONS,
+  parseStyleBooleans,
+  serializeStyleString,
+} from "@/lib/fontConstants";
 
 export function PosterTemplateDesigner({ initialTemplate, onBack, onSaved }) {
   const { competitions } = useCompetitions();
@@ -56,6 +60,7 @@ export function PosterTemplateDesigner({ initialTemplate, onBack, onSaved }) {
     size: existingNameZone?.size ?? 28,
     color: existingNameZone?.color || "#FFFFFF",
     align: existingNameZone?.align || "center",
+    style: existingNameZone?.style || "bold",
   });
 
   // Ref Zone state
@@ -67,6 +72,7 @@ export function PosterTemplateDesigner({ initialTemplate, onBack, onSaved }) {
     size: existingRefZone?.size ?? 16,
     color: existingRefZone?.color || "#F59E0B",
     align: existingRefZone?.align || "center",
+    style: existingRefZone?.style || "normal",
   });
 
   useEffect(() => {
@@ -106,6 +112,7 @@ export function PosterTemplateDesigner({ initialTemplate, onBack, onSaved }) {
             size: nz.size ?? 28,
             color: nz.color || "#FFFFFF",
             align: nz.align || "center",
+            style: nz.style || "bold",
           });
         }
 
@@ -118,6 +125,7 @@ export function PosterTemplateDesigner({ initialTemplate, onBack, onSaved }) {
             size: rz.size ?? 16,
             color: rz.color || "#F59E0B",
             align: rz.align || "center",
+            style: rz.style || "normal",
           });
         }
       }
@@ -163,7 +171,7 @@ export function PosterTemplateDesigner({ initialTemplate, onBack, onSaved }) {
             size: Number(nameZone.size),
             color: nameZone.color,
             align: nameZone.align,
-            style: "bold",
+            style: nameZone.style || "bold",
           },
           {
             key: "ref",
@@ -173,7 +181,7 @@ export function PosterTemplateDesigner({ initialTemplate, onBack, onSaved }) {
             size: Number(refZone.size),
             color: refZone.color,
             align: refZone.align,
-            style: "normal",
+            style: refZone.style || "normal",
           },
         ],
       });
@@ -397,24 +405,85 @@ export function PosterTemplateDesigner({ initialTemplate, onBack, onSaved }) {
               options={FONT_OPTIONS}
             />
 
-            <div className="grid grid-cols-2 gap-3">
+            {/* Font Size, Bold & Italic Controls */}
+            <div className="p-3 bg-gray-50 rounded-xl border border-gray-200/70 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-700">Typography Style</span>
+                {(() => {
+                  const { isBold, isItalic } = parseStyleBooleans(nameZone.style);
+                  return (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        title="Toggle Bold"
+                        onClick={() =>
+                          setNameZone({
+                            ...nameZone,
+                            style: serializeStyleString(!isBold, isItalic),
+                          })
+                        }
+                        className={`px-2.5 py-1 rounded-lg border text-xs font-bold flex items-center gap-1 transition-all ${
+                          isBold
+                            ? "bg-[#29479B] text-white border-[#29479B] shadow-xs"
+                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+                        }`}
+                      >
+                        <Bold className="w-3.5 h-3.5" /> Bold
+                      </button>
+                      <button
+                        type="button"
+                        title="Toggle Italic"
+                        onClick={() =>
+                          setNameZone({
+                            ...nameZone,
+                            style: serializeStyleString(isBold, !isItalic),
+                          })
+                        }
+                        className={`px-2.5 py-1 rounded-lg border text-xs italic flex items-center gap-1 transition-all ${
+                          isItalic
+                            ? "bg-[#29479B] text-white border-[#29479B] shadow-xs"
+                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+                        }`}
+                      >
+                        <Italic className="w-3.5 h-3.5" /> Italic
+                      </button>
+                    </div>
+                  );
+                })()}
+              </div>
+
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Font Size ({nameZone.size}pt)
-                </label>
+                <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                  <span>Font Size</span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="12"
+                      max="100"
+                      value={nameZone.size}
+                      onChange={(e) =>
+                        setNameZone({ ...nameZone, size: Number(e.target.value) || 12 })
+                      }
+                      className="w-16 px-1.5 py-0.5 text-xs text-center font-bold border border-gray-300 rounded bg-white"
+                    />
+                    <span className="text-gray-400">pt</span>
+                  </div>
+                </div>
                 <input
                   type="range"
                   min="14"
-                  max="64"
+                  max="80"
                   value={nameZone.size}
                   onChange={(e) => setNameZone({ ...nameZone, size: Number(e.target.value) })}
                   className="w-full accent-[#29479B]"
                 />
               </div>
+            </div>
 
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Color
+                  Text Color
                 </label>
                 <div className="flex items-center gap-1.5">
                   <input
@@ -430,27 +499,27 @@ export function PosterTemplateDesigner({ initialTemplate, onBack, onSaved }) {
                   />
                 </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                label="Center X (%)"
-                type="number"
-                step="0.1"
-                min="0"
-                max="100"
-                value={nameZone.x}
-                onChange={(e) => setNameZone({ ...nameZone, x: parseFloat(e.target.value) || 0 })}
-              />
-              <Input
-                label="Center Y (%)"
-                type="number"
-                step="0.1"
-                min="0"
-                max="100"
-                value={nameZone.y}
-                onChange={(e) => setNameZone({ ...nameZone, y: parseFloat(e.target.value) || 0 })}
-              />
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  label="Center X (%)"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={nameZone.x}
+                  onChange={(e) => setNameZone({ ...nameZone, x: parseFloat(e.target.value) || 0 })}
+                />
+                <Input
+                  label="Center Y (%)"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={nameZone.y}
+                  onChange={(e) => setNameZone({ ...nameZone, y: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
             </div>
           </div>
         </Card>
@@ -475,24 +544,85 @@ export function PosterTemplateDesigner({ initialTemplate, onBack, onSaved }) {
               options={FONT_OPTIONS}
             />
 
-            <div className="grid grid-cols-2 gap-3">
+            {/* Font Size, Bold & Italic Controls */}
+            <div className="p-3 bg-gray-50 rounded-xl border border-gray-200/70 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-700">Typography Style</span>
+                {(() => {
+                  const { isBold, isItalic } = parseStyleBooleans(refZone.style);
+                  return (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        title="Toggle Bold"
+                        onClick={() =>
+                          setRefZone({
+                            ...refZone,
+                            style: serializeStyleString(!isBold, isItalic),
+                          })
+                        }
+                        className={`px-2.5 py-1 rounded-lg border text-xs font-bold flex items-center gap-1 transition-all ${
+                          isBold
+                            ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+                        }`}
+                      >
+                        <Bold className="w-3.5 h-3.5" /> Bold
+                      </button>
+                      <button
+                        type="button"
+                        title="Toggle Italic"
+                        onClick={() =>
+                          setRefZone({
+                            ...refZone,
+                            style: serializeStyleString(isBold, !isItalic),
+                          })
+                        }
+                        className={`px-2.5 py-1 rounded-lg border text-xs italic flex items-center gap-1 transition-all ${
+                          isItalic
+                            ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+                        }`}
+                      >
+                        <Italic className="w-3.5 h-3.5" /> Italic
+                      </button>
+                    </div>
+                  );
+                })()}
+              </div>
+
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Font Size ({refZone.size}pt)
-                </label>
+                <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                  <span>Font Size</span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="10"
+                      max="60"
+                      value={refZone.size}
+                      onChange={(e) =>
+                        setRefZone({ ...refZone, size: Number(e.target.value) || 10 })
+                      }
+                      className="w-16 px-1.5 py-0.5 text-xs text-center font-bold border border-gray-300 rounded bg-white"
+                    />
+                    <span className="text-gray-400">pt</span>
+                  </div>
+                </div>
                 <input
                   type="range"
                   min="10"
-                  max="40"
+                  max="50"
                   value={refZone.size}
                   onChange={(e) => setRefZone({ ...refZone, size: Number(e.target.value) })}
                   className="w-full accent-amber-600"
                 />
               </div>
+            </div>
 
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Color
+                  Text Color
                 </label>
                 <div className="flex items-center gap-1.5">
                   <input
@@ -508,27 +638,27 @@ export function PosterTemplateDesigner({ initialTemplate, onBack, onSaved }) {
                   />
                 </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                label="Center X (%)"
-                type="number"
-                step="0.1"
-                min="0"
-                max="100"
-                value={refZone.x}
-                onChange={(e) => setRefZone({ ...refZone, x: parseFloat(e.target.value) || 0 })}
-              />
-              <Input
-                label="Center Y (%)"
-                type="number"
-                step="0.1"
-                min="0"
-                max="100"
-                value={refZone.y}
-                onChange={(e) => setRefZone({ ...refZone, y: parseFloat(e.target.value) || 0 })}
-              />
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  label="Center X (%)"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={refZone.x}
+                  onChange={(e) => setRefZone({ ...refZone, x: parseFloat(e.target.value) || 0 })}
+                />
+                <Input
+                  label="Center Y (%)"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={refZone.y}
+                  onChange={(e) => setRefZone({ ...refZone, y: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
             </div>
           </div>
         </Card>

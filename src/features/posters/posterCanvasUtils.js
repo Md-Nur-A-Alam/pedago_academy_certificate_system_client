@@ -1,6 +1,7 @@
 /**
  * Utility to generate cropped photo preview and composite final high-res poster canvas
  */
+import { buildCanvasFont } from "@/lib/fontConstants";
 
 export const createImage = (url) =>
   new Promise((resolve, reject) => {
@@ -183,8 +184,11 @@ export async function generateCompositePoster({
       if (!textToRender) return;
 
       const sizePx = (zone.size || 24) * (width / 1000) * 1.3;
-      const weight = zone.style === "bold" ? "bold" : "600";
-      ctx.font = `${weight} ${sizePx}px "${zone.font || "Montserrat"}", sans-serif`;
+      ctx.font = buildCanvasFont({
+        font: zone.font || "Montserrat",
+        size: sizePx,
+        style: zone.style || "bold",
+      });
       ctx.fillStyle = zone.color || "#FFFFFF";
       ctx.textAlign = zone.align || "center";
       ctx.textBaseline = "middle";

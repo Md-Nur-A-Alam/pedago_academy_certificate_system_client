@@ -1,7 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Save, Sparkles, UploadCloud, Target, Sliders, CheckCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  Save,
+  Sparkles,
+  UploadCloud,
+  Target,
+  Sliders,
+  CheckCircle,
+  Bold,
+  Italic,
+} from "lucide-react";
 import { useCompetitions } from "../competitions/useCompetitions";
 import { useCertificateTemplates } from "./useCertificateTemplates";
 import { useCurrentAdmin } from "../auth/useCurrentAdmin";
@@ -14,29 +24,11 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
 import { toast } from "react-toastify";
-
-const FONT_OPTIONS = [
-  // Serif
-  { label: "Playfair Display (Serif)", value: "Playfair Display" },
-  { label: "Cinzel (Serif)", value: "Cinzel" },
-  { label: "Merriweather (Serif)", value: "Merriweather" },
-  { label: "Garamond (Serif)", value: "Garamond" },
-  { label: "Baskerville (Serif)", value: "Baskerville" },
-  { label: "Times New Roman (Serif)", value: "Times New Roman" },
-  { label: "Georgia (Serif)", value: "Georgia" },
-  // Script
-  { label: "Great Vibes (Script)", value: "Great Vibes" },
-  { label: "Alex Brush (Script)", value: "Alex Brush" },
-  { label: "Allura (Script)", value: "Allura" },
-  { label: "Dancing Script (Script)", value: "Dancing Script" },
-  { label: "Satisfy (Script)", value: "Satisfy" },
-  // Sans-serif
-  { label: "Montserrat (Sans-serif)", value: "Montserrat" },
-  { label: "Raleway (Sans-serif)", value: "Raleway" },
-  { label: "Roboto (Sans-serif)", value: "Roboto" },
-  { label: "Open Sans (Sans-serif)", value: "Open Sans" },
-  { label: "Helvetica (Sans-serif)", value: "Helvetica" },
-];
+import {
+  FONT_OPTIONS,
+  parseStyleBooleans,
+  serializeStyleString,
+} from "@/lib/fontConstants";
 
 export function CertificateTemplateDesigner({ initialTemplate, onBack, onSaved }) {
   const { competitions } = useCompetitions();
@@ -61,6 +53,7 @@ export function CertificateTemplateDesigner({ initialTemplate, onBack, onSaved }
     size: initialTemplate?.nameZone?.size ?? 44,
     color: initialTemplate?.nameZone?.color || "#1A284A",
     align: initialTemplate?.nameZone?.align || "center",
+    style: initialTemplate?.nameZone?.style || "normal",
   });
 
   // Reference Code Zone state (coordinates as percentages 0-100)
@@ -71,6 +64,7 @@ export function CertificateTemplateDesigner({ initialTemplate, onBack, onSaved }
     size: initialTemplate?.refZone?.size ?? 16,
     color: initialTemplate?.refZone?.color || "#29479B",
     align: initialTemplate?.refZone?.align || "center",
+    style: initialTemplate?.refZone?.style || "normal",
   });
 
   // Automatically select first competition if none selected
@@ -103,6 +97,7 @@ export function CertificateTemplateDesigner({ initialTemplate, onBack, onSaved }
           size: match.nameZone?.size ?? 44,
           color: match.nameZone?.color || "#1A284A",
           align: match.nameZone?.align || "center",
+          style: match.nameZone?.style || "normal",
         });
         setRefZone({
           x: normRefX,
@@ -111,6 +106,7 @@ export function CertificateTemplateDesigner({ initialTemplate, onBack, onSaved }
           size: match.refZone?.size ?? 16,
           color: match.refZone?.color || "#29479B",
           align: match.refZone?.align || "center",
+          style: match.refZone?.style || "normal",
         });
       }
     }
@@ -144,12 +140,14 @@ export function CertificateTemplateDesigner({ initialTemplate, onBack, onSaved }
           x: Number(nameZone.x),
           y: Number(nameZone.y),
           size: Number(nameZone.size),
+          style: nameZone.style || "normal",
         },
         refZone: {
           ...refZone,
           x: Number(refZone.x),
           y: Number(refZone.y),
           size: Number(refZone.size),
+          style: refZone.style || "normal",
         },
       });
 
@@ -303,21 +301,82 @@ export function CertificateTemplateDesigner({ initialTemplate, onBack, onSaved }
               options={FONT_OPTIONS}
             />
 
-            <div className="grid grid-cols-2 gap-3">
+            {/* Font Size, Bold & Italic Controls */}
+            <div className="p-3 bg-gray-50 rounded-xl border border-gray-200/70 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-700">Font Typography</span>
+                {(() => {
+                  const { isBold, isItalic } = parseStyleBooleans(nameZone.style);
+                  return (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        title="Toggle Bold"
+                        onClick={() =>
+                          setNameZone({
+                            ...nameZone,
+                            style: serializeStyleString(!isBold, isItalic),
+                          })
+                        }
+                        className={`px-2.5 py-1 rounded-lg border text-xs font-bold flex items-center gap-1 transition-all ${
+                          isBold
+                            ? "bg-[#29479B] text-white border-[#29479B] shadow-xs"
+                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+                        }`}
+                      >
+                        <Bold className="w-3.5 h-3.5" /> Bold
+                      </button>
+                      <button
+                        type="button"
+                        title="Toggle Italic"
+                        onClick={() =>
+                          setNameZone({
+                            ...nameZone,
+                            style: serializeStyleString(isBold, !isItalic),
+                          })
+                        }
+                        className={`px-2.5 py-1 rounded-lg border text-xs italic flex items-center gap-1 transition-all ${
+                          isItalic
+                            ? "bg-[#29479B] text-white border-[#29479B] shadow-xs"
+                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+                        }`}
+                      >
+                        <Italic className="w-3.5 h-3.5" /> Italic
+                      </button>
+                    </div>
+                  );
+                })()}
+              </div>
+
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Font Size ({nameZone.size}pt)
-                </label>
+                <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                  <span>Font Size</span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="12"
+                      max="120"
+                      value={nameZone.size}
+                      onChange={(e) =>
+                        setNameZone({ ...nameZone, size: Number(e.target.value) || 12 })
+                      }
+                      className="w-16 px-1.5 py-0.5 text-xs text-center font-bold border border-gray-300 rounded bg-white"
+                    />
+                    <span className="text-gray-400">pt</span>
+                  </div>
+                </div>
                 <input
                   type="range"
-                  min="16"
-                  max="96"
+                  min="14"
+                  max="100"
                   value={nameZone.size}
                   onChange={(e) => setNameZone({ ...nameZone, size: Number(e.target.value) })}
                   className="w-full accent-[#29479B]"
                 />
               </div>
+            </div>
 
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
                   Text Color
@@ -336,9 +395,7 @@ export function CertificateTemplateDesigner({ initialTemplate, onBack, onSaved }
                   />
                 </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-3">
               <Select
                 label="Text Alignment"
                 value={nameZone.align}
@@ -349,27 +406,27 @@ export function CertificateTemplateDesigner({ initialTemplate, onBack, onSaved }
                   { label: "Right Aligned", value: "right" },
                 ]}
               />
+            </div>
 
-              <div className="flex gap-2">
-                <Input
-                  label="X Position (%)"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  value={nameZone.x}
-                  onChange={(e) => setNameZone({ ...nameZone, x: parseFloat(e.target.value) || 0 })}
-                />
-                <Input
-                  label="Y Position (%)"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  value={nameZone.y}
-                  onChange={(e) => setNameZone({ ...nameZone, y: parseFloat(e.target.value) || 0 })}
-                />
-              </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                label="X Position (%)"
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                value={nameZone.x}
+                onChange={(e) => setNameZone({ ...nameZone, x: parseFloat(e.target.value) || 0 })}
+              />
+              <Input
+                label="Y Position (%)"
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                value={nameZone.y}
+                onChange={(e) => setNameZone({ ...nameZone, y: parseFloat(e.target.value) || 0 })}
+              />
             </div>
           </div>
         </Card>
@@ -394,21 +451,82 @@ export function CertificateTemplateDesigner({ initialTemplate, onBack, onSaved }
               options={FONT_OPTIONS}
             />
 
-            <div className="grid grid-cols-2 gap-3">
+            {/* Font Size, Bold & Italic Controls */}
+            <div className="p-3 bg-gray-50 rounded-xl border border-gray-200/70 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-700">Font Typography</span>
+                {(() => {
+                  const { isBold, isItalic } = parseStyleBooleans(refZone.style);
+                  return (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        title="Toggle Bold"
+                        onClick={() =>
+                          setRefZone({
+                            ...refZone,
+                            style: serializeStyleString(!isBold, isItalic),
+                          })
+                        }
+                        className={`px-2.5 py-1 rounded-lg border text-xs font-bold flex items-center gap-1 transition-all ${
+                          isBold
+                            ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+                        }`}
+                      >
+                        <Bold className="w-3.5 h-3.5" /> Bold
+                      </button>
+                      <button
+                        type="button"
+                        title="Toggle Italic"
+                        onClick={() =>
+                          setRefZone({
+                            ...refZone,
+                            style: serializeStyleString(isBold, !isItalic),
+                          })
+                        }
+                        className={`px-2.5 py-1 rounded-lg border text-xs italic flex items-center gap-1 transition-all ${
+                          isItalic
+                            ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+                        }`}
+                      >
+                        <Italic className="w-3.5 h-3.5" /> Italic
+                      </button>
+                    </div>
+                  );
+                })()}
+              </div>
+
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Font Size ({refZone.size}pt)
-                </label>
+                <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                  <span>Font Size</span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="10"
+                      max="72"
+                      value={refZone.size}
+                      onChange={(e) =>
+                        setRefZone({ ...refZone, size: Number(e.target.value) || 10 })
+                      }
+                      className="w-16 px-1.5 py-0.5 text-xs text-center font-bold border border-gray-300 rounded bg-white"
+                    />
+                    <span className="text-gray-400">pt</span>
+                  </div>
+                </div>
                 <input
                   type="range"
                   min="10"
-                  max="48"
+                  max="60"
                   value={refZone.size}
                   onChange={(e) => setRefZone({ ...refZone, size: Number(e.target.value) })}
                   className="w-full accent-amber-600"
                 />
               </div>
+            </div>
 
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
                   Text Color
@@ -427,9 +545,7 @@ export function CertificateTemplateDesigner({ initialTemplate, onBack, onSaved }
                   />
                 </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-3">
               <Select
                 label="Text Alignment"
                 value={refZone.align}
@@ -440,27 +556,27 @@ export function CertificateTemplateDesigner({ initialTemplate, onBack, onSaved }
                   { label: "Right Aligned", value: "right" },
                 ]}
               />
+            </div>
 
-              <div className="flex gap-2">
-                <Input
-                  label="X Position (%)"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  value={refZone.x}
-                  onChange={(e) => setRefZone({ ...refZone, x: parseFloat(e.target.value) || 0 })}
-                />
-                <Input
-                  label="Y Position (%)"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  value={refZone.y}
-                  onChange={(e) => setRefZone({ ...refZone, y: parseFloat(e.target.value) || 0 })}
-                />
-              </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                label="X Position (%)"
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                value={refZone.x}
+                onChange={(e) => setRefZone({ ...refZone, x: parseFloat(e.target.value) || 0 })}
+              />
+              <Input
+                label="Y Position (%)"
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                value={refZone.y}
+                onChange={(e) => setRefZone({ ...refZone, y: parseFloat(e.target.value) || 0 })}
+              />
             </div>
           </div>
         </Card>

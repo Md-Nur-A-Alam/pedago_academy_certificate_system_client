@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { useCurrentAdmin } from "../auth/useCurrentAdmin";
+import { buildCanvasFont, parseStyleBooleans } from "@/lib/fontConstants";
 
 const DEFAULT_SAMPLE_PHOTO =
   "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80";
@@ -111,7 +112,11 @@ export function PosterTestPreviewModal({ isOpen, onClose, template }) {
         // Render Name text
         if (testName) {
           const nameSizePx = (nameZone.size || 26) * (canvas.width / 1000) * 1.3;
-          ctx.font = `bold ${nameSizePx}px "${nameZone.font || "Montserrat"}", sans-serif`;
+          ctx.font = buildCanvasFont({
+            font: nameZone.font || "Montserrat",
+            size: nameSizePx,
+            style: nameZone.style || "bold",
+          });
           ctx.fillStyle = nameZone.color || "#FFFFFF";
           ctx.textAlign = nameZone.align || "center";
           ctx.textBaseline = "middle";
@@ -127,7 +132,11 @@ export function PosterTestPreviewModal({ isOpen, onClose, template }) {
         // Render Ref Code text
         if (testRef) {
           const refSizePx = (refZone.size || 16) * (canvas.width / 1000) * 1.3;
-          ctx.font = `${refSizePx}px "${refZone.font || "Montserrat"}", sans-serif`;
+          ctx.font = buildCanvasFont({
+            font: refZone.font || "Montserrat",
+            size: refSizePx,
+            style: refZone.style || "normal",
+          });
           ctx.fillStyle = refZone.color || "#F59E0B";
           ctx.textAlign = refZone.align || "center";
           ctx.textBaseline = "middle";
@@ -303,44 +312,58 @@ export function PosterTestPreviewModal({ isOpen, onClose, template }) {
             </div>
 
             {/* Rendered Name */}
-            <div
-              className="absolute select-none pointer-events-none"
-              style={{
-                left: `${nameZone.x}%`,
-                top: `${nameZone.y}%`,
-                transform: getTransform(nameZone.align),
-                fontFamily: nameZone.font || "Montserrat",
-                fontSize: `${scaleFont(nameZone.size)}px`,
-                color: nameZone.color || "#FFFFFF",
-                textAlign: nameZone.align || "center",
-                whiteSpace: "nowrap",
-                lineHeight: 1.2,
-                textShadow: "0 2px 4px rgba(0,0,0,0.6)",
-                zIndex: 25,
-              }}
-            >
-              {testName}
-            </div>
+            {(() => {
+              const { isBold, isItalic } = parseStyleBooleans(nameZone.style);
+              return (
+                <div
+                  className="absolute select-none pointer-events-none"
+                  style={{
+                    left: `${nameZone.x}%`,
+                    top: `${nameZone.y}%`,
+                    transform: getTransform(nameZone.align),
+                    fontFamily: nameZone.font || "Montserrat",
+                    fontSize: `${scaleFont(nameZone.size)}px`,
+                    fontWeight: isBold ? "bold" : "normal",
+                    fontStyle: isItalic ? "italic" : "normal",
+                    color: nameZone.color || "#FFFFFF",
+                    textAlign: nameZone.align || "center",
+                    whiteSpace: "nowrap",
+                    lineHeight: 1.2,
+                    textShadow: "0 2px 4px rgba(0,0,0,0.6)",
+                    zIndex: 25,
+                  }}
+                >
+                  {testName}
+                </div>
+              );
+            })()}
 
             {/* Rendered Ref */}
-            <div
-              className="absolute select-none pointer-events-none"
-              style={{
-                left: `${refZone.x}%`,
-                top: `${refZone.y}%`,
-                transform: getTransform(refZone.align),
-                fontFamily: refZone.font || "Montserrat",
-                fontSize: `${scaleFont(refZone.size)}px`,
-                color: refZone.color || "#F59E0B",
-                textAlign: refZone.align || "center",
-                whiteSpace: "nowrap",
-                lineHeight: 1.2,
-                textShadow: "0 2px 4px rgba(0,0,0,0.6)",
-                zIndex: 25,
-              }}
-            >
-              {testRef}
-            </div>
+            {(() => {
+              const { isBold, isItalic } = parseStyleBooleans(refZone.style);
+              return (
+                <div
+                  className="absolute select-none pointer-events-none"
+                  style={{
+                    left: `${refZone.x}%`,
+                    top: `${refZone.y}%`,
+                    transform: getTransform(refZone.align),
+                    fontFamily: refZone.font || "Montserrat",
+                    fontSize: `${scaleFont(refZone.size)}px`,
+                    fontWeight: isBold ? "bold" : "normal",
+                    fontStyle: isItalic ? "italic" : "normal",
+                    color: refZone.color || "#F59E0B",
+                    textAlign: refZone.align || "center",
+                    whiteSpace: "nowrap",
+                    lineHeight: 1.2,
+                    textShadow: "0 2px 4px rgba(0,0,0,0.6)",
+                    zIndex: 25,
+                  }}
+                >
+                  {testRef}
+                </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -359,7 +382,7 @@ export function PosterTestPreviewModal({ isOpen, onClose, template }) {
             <span className="font-bold text-gray-700 block mb-1">👤 Name Placement:</span>
             <span className="text-gray-500">
               Center: <strong className="text-gray-700">{nameZone.x}%, {nameZone.y}%</strong> | Font:{" "}
-              <strong className="text-gray-700">{nameZone.font}</strong> ({nameZone.size}pt)
+              <strong className="text-gray-700">{nameZone.font}</strong> ({nameZone.size}pt, {nameZone.style || "bold"})
             </span>
           </div>
 
@@ -367,7 +390,7 @@ export function PosterTestPreviewModal({ isOpen, onClose, template }) {
             <span className="font-bold text-gray-700 block mb-1">🏷️ Ref Code Placement:</span>
             <span className="text-gray-500">
               Center: <strong className="text-gray-700">{refZone.x}%, {refZone.y}%</strong> | Font:{" "}
-              <strong className="text-gray-700">{refZone.font}</strong> ({refZone.size}pt)
+              <strong className="text-gray-700">{refZone.font}</strong> ({refZone.size}pt, {refZone.style || "normal"})
             </span>
           </div>
         </div>
