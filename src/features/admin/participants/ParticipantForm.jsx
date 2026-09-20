@@ -26,6 +26,7 @@ export function ParticipantForm({ initialData, onSubmit, onClose, isLoading }) {
     formState: { errors },
   } = useForm({
     resolver: zodResolver(participantFormSchema),
+    mode: "onChange",
     defaultValues: {
       name: "",
       phone: "",
@@ -42,15 +43,8 @@ export function ParticipantForm({ initialData, onSubmit, onClose, isLoading }) {
         competitionId: initialData.competitionId?._id || initialData.competitionId || "",
         achievementType: initialData.achievementType || "participant",
       });
-    } else {
-      reset({
-        name: "",
-        phone: "",
-        competitionId: competitions[0]?._id || "",
-        achievementType: "participant",
-      });
     }
-  }, [initialData, reset, competitions]);
+  }, [initialData, reset]);
 
   const handleFormSubmit = async (data) => {
     await onSubmit(data);

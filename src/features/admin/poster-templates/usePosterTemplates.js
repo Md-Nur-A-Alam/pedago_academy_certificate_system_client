@@ -10,13 +10,16 @@ export function usePosterTemplates(params = {}) {
   const templatesQuery = useQuery({
     queryKey: ["poster-templates", params],
     queryFn: async () => {
+      console.log("[HOOK DEBUG: PosterTemplates] Fetching poster templates with params:", params);
       const { data } = await apiClient.get("/api/posters/templates", { params });
+      console.log("[HOOK DEBUG: PosterTemplates] Received templates:", data?.data?.length);
       return data.data;
     },
   });
 
   const saveMutation = useMutation({
     mutationFn: async (payload) => {
+      console.log("[HOOK DEBUG: PosterTemplates] Saving poster template:", payload);
       const { data } = await apiClient.post("/api/posters/templates", payload);
       return data.data;
     },
@@ -26,6 +29,7 @@ export function usePosterTemplates(params = {}) {
     },
     onError: (err) => {
       const msg = err.response?.data?.message || err.message || "Failed to save poster template";
+      console.error("[HOOK DEBUG: PosterTemplates] Save error:", msg);
       toast.error(msg);
     },
   });
@@ -33,6 +37,8 @@ export function usePosterTemplates(params = {}) {
   return {
     templates: templatesQuery.data || [],
     isLoading: templatesQuery.isLoading,
+    isError: templatesQuery.isError,
+    error: templatesQuery.error,
     saveTemplate: saveMutation.mutateAsync,
     isSaving: saveMutation.isPending,
   };

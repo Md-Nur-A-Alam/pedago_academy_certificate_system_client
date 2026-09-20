@@ -1,4 +1,5 @@
 "use client";
+"use no memo";
 
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -7,11 +8,12 @@ import { z } from "zod";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
+import { ImageUpload } from "@/components/ui/ImageUpload";
 
 const competitionFormSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: z.string().min(1, "Name is required").trim(),
   description: z.string().optional().default(""),
-  refPrefix: z.string().min(1, "Prefix is required").transform((val) => val.toUpperCase().trim()),
+  refPrefix: z.string().min(1, "Prefix is required").trim(),
   refPadding: z.coerce.number().min(0).max(6).default(0),
   sourceLink: z.string().optional().default(""),
   imageUrl: z.string().optional().default(""),
@@ -23,20 +25,24 @@ export function CompetitionForm({ initialData, onSubmit, onClose, isLoading }) {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(competitionFormSchema),
+    mode: "onChange",
     defaultValues: {
-      name: "",
-      description: "",
-      refPrefix: "",
-      refPadding: 0,
-      sourceLink: "",
-      imageUrl: "",
-      status: "draft",
+      name: initialData?.name || "",
+      description: initialData?.description || "",
+      refPrefix: initialData?.refPrefix || "",
+      refPadding: initialData?.refPadding ?? 0,
+      sourceLink: initialData?.sourceLink || "",
+      imageUrl: initialData?.imageUrl || "",
+      status: initialData?.status || "draft",
     },
   });
 
+  // Only reset if editing an existing competition and initialData changes
   useEffect(() => {
     if (initialData) {
       reset({
@@ -48,21 +54,16 @@ export function CompetitionForm({ initialData, onSubmit, onClose, isLoading }) {
         imageUrl: initialData.imageUrl || "",
         status: initialData.status || "draft",
       });
-    } else {
-      reset({
-        name: "",
-        description: "",
-        refPrefix: "",
-        refPadding: 0,
-        sourceLink: "",
-        imageUrl: "",
-        status: "draft",
-      });
     }
   }, [initialData, reset]);
 
   const handleFormSubmit = async (data) => {
-    await onSubmit(data);
+    // Ensure refPrefix is uppercase
+    const payload = {
+      ...data,
+      refPrefix: data.refPrefix.toUpperCase().trim(),
+    };
+    await onSubmit(payload);
     onClose();
   };
 
@@ -118,15 +119,16 @@ export function CompetitionForm({ initialData, onSubmit, onClose, isLoading }) {
         {...register("sourceLink")}
       />
 
-      <Input
-        label="Image URL (Optional)"
-        placeholder="https://..."
+      <ImageUpload
+        label="Competition Banner / Poster Image"
+        value={watch("imageUrl")}
+        onChange={(url) => setValue("imageUrl", url, { shouldValidate: true })}
         error={errors.imageUrl?.message}
-        {...register("imageUrl")}
+        helpText="Upload a banner image directly or paste a Facebook image link to host permanently on ImgBB"
       />
 
       <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-        <Button type="button" variant="outline" onClick={onClose}>
+        <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
           Cancel
         </Button>
         <Button type="submit" variant="primary" disabled={isLoading}>

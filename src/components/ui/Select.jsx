@@ -2,15 +2,11 @@
 
 import React from "react";
 
-export function Select({
-  label,
-  options = [],
-  error,
-  className = "",
-  id,
-  ...props
-}) {
-  const selectId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+export const Select = React.forwardRef(function Select(
+  { label, options = [], error, className = "", id, ...props },
+  ref
+) {
+  const selectId = id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
 
   return (
     <div className="w-full">
@@ -20,6 +16,7 @@ export function Select({
         </label>
       )}
       <select
+        ref={ref}
         id={selectId}
         className={`w-full px-3.5 py-2 border rounded-lg text-sm bg-white transition-colors focus:outline-hidden focus:ring-2 focus:ring-[#29479B] focus:border-transparent ${
           error ? "border-red-500" : "border-gray-300"
@@ -35,4 +32,6 @@ export function Select({
       {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
     </div>
   );
-}
+});
+
+export default Select;

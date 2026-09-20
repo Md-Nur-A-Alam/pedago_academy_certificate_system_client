@@ -10,13 +10,16 @@ export function useParticipants(params = {}) {
   const participantsQuery = useQuery({
     queryKey: ["participants", params],
     queryFn: async () => {
+      console.log("[HOOK DEBUG: Participants] Fetching participants with params:", params);
       const { data } = await apiClient.get("/api/participants", { params });
+      console.log("[HOOK DEBUG: Participants] Received count:", data?.data?.length);
       return data;
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (payload) => {
+      console.log("[HOOK DEBUG: Participants] Creating participant:", payload);
       const { data } = await apiClient.post("/api/participants", payload);
       return data.data;
     },
@@ -26,12 +29,14 @@ export function useParticipants(params = {}) {
     },
     onError: (err) => {
       const msg = err.response?.data?.message || err.message || "Failed to create participant";
+      console.error("[HOOK DEBUG: Participants] Create error:", msg);
       toast.error(msg);
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data: payload }) => {
+      console.log(`[HOOK DEBUG: Participants] Updating participant ${id}:`, payload);
       const { data } = await apiClient.patch(`/api/participants/${id}`, payload);
       return data.data;
     },
@@ -41,12 +46,14 @@ export function useParticipants(params = {}) {
     },
     onError: (err) => {
       const msg = err.response?.data?.message || err.message || "Failed to update participant";
+      console.error("[HOOK DEBUG: Participants] Update error:", msg);
       toast.error(msg);
     },
   });
 
   const archiveMutation = useMutation({
     mutationFn: async (id) => {
+      console.log(`[HOOK DEBUG: Participants] Archiving participant ${id}`);
       const { data } = await apiClient.delete(`/api/participants/${id}`);
       return data.data;
     },
@@ -56,12 +63,14 @@ export function useParticipants(params = {}) {
     },
     onError: (err) => {
       const msg = err.response?.data?.message || err.message || "Failed to archive participant";
+      console.error("[HOOK DEBUG: Participants] Archive error:", msg);
       toast.error(msg);
     },
   });
 
   const bulkUploadMutation = useMutation({
     mutationFn: async (payload) => {
+      console.log("[HOOK DEBUG: Participants] Bulk uploading participants...");
       const { data } = await apiClient.post("/api/participants/bulk-upload", payload);
       return data;
     },
@@ -71,6 +80,7 @@ export function useParticipants(params = {}) {
     },
     onError: (err) => {
       const msg = err.response?.data?.message || err.message || "Failed to import participants";
+      console.error("[HOOK DEBUG: Participants] Bulk upload error:", msg);
       toast.error(msg);
     },
   });
@@ -79,6 +89,8 @@ export function useParticipants(params = {}) {
     participants: participantsQuery.data?.data || [],
     pagination: participantsQuery.data?.pagination || {},
     isLoading: participantsQuery.isLoading,
+    isError: participantsQuery.isError,
+    error: participantsQuery.error,
     createParticipant: createMutation.mutateAsync,
     isCreating: createMutation.isPending,
     updateParticipant: updateMutation.mutateAsync,
