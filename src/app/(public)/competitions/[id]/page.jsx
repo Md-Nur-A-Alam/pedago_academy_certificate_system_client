@@ -44,6 +44,7 @@ export default function CompetitionDetailsPage() {
   const [lightboxImage, setLightboxImage] = useState(null); // url string or null
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxList, setLightboxList] = useState([]); // array of urls
+  const [galleryFilter, setGalleryFilter] = useState("all");
 
   // Fetch Competition by ID
   const {
@@ -60,6 +61,62 @@ export default function CompetitionDetailsPage() {
     },
     enabled: Boolean(id),
   });
+
+  // Prepare full linked gallery list with robust fallbacks (top-level hook)
+  const linkedGallery = useMemo(() => {
+    if (Array.isArray(competition?.linkedGallery) && competition.linkedGallery.length > 0) {
+      return competition.linkedGallery;
+    }
+    const list = [];
+    const seen = new Set();
+    const add = (url, type, label, sublabel = "") => {
+      if (!url || typeof url !== "string") return;
+      const t = url.trim();
+      if (!t || seen.has(t)) return;
+      seen.add(t);
+      list.push({ url: t, type, label, sublabel });
+    };
+
+    if (competition?.imageUrl) {
+      add(competition.imageUrl, "main", "মূল ব্যানার ছবি", "Main Banner");
+    }
+
+    if (Array.isArray(competition?.categoryGroups)) {
+      competition.categoryGroups.forEach((g, idx) => {
+        if (Array.isArray(g.pictures)) {
+          g.pictures.forEach((pic, pIdx) => {
+            add(pic, "group", `ক্যাটাগরি: ${g.name || `#${idx + 1}`}`, `গ্রুপ ছবি ${pIdx + 1}`);
+          });
+        }
+      });
+    }
+
+    if (Array.isArray(competition?.galleryImages)) {
+      competition.galleryImages.forEach((img, idx) => {
+        add(img, "other", `সংযুক্ত ছবি #${idx + 1}`, "Competition Photo");
+      });
+    }
+
+    return list;
+  }, [competition]);
+
+  const filteredGallery = useMemo(() => {
+    if (galleryFilter === "all") return linkedGallery;
+    return linkedGallery.filter((item) => item.type === galleryFilter);
+  }, [linkedGallery, galleryFilter]);
+
+  const groups =
+    Array.isArray(competition?.categoryGroups) && competition.categoryGroups.length > 0
+      ? competition.categoryGroups
+      : Array.isArray(competition?.categories) && competition.categories.length > 0
+      ? competition.categories.map((c) => ({
+          name: c,
+          details: "",
+          criteria: "",
+          rules: "",
+          pictures: [],
+        }))
+      : [{ name: competition?.category || "General", details: "", criteria: "", rules: "", pictures: [] }];
 
   // Update Mutation for Admin
   const updateCompetitionMutation = useMutation({
@@ -186,50 +243,6 @@ export default function CompetitionDetailsPage() {
 
   const isActive = competition.status === "active";
   const isArchived = competition.status === "archived";
-  const [galleryFilter, setGalleryFilter] = useState("all");
-
-  // Prepare full linked gallery list with robust fallbacks
-  const linkedGallery = useMemo(() => {
-    if (Array.isArray(competition?.linkedGallery) && competition.linkedGallery.length > 0) {
-      return competition.linkedGallery;
-    }
-    const list = [];
-    const seen = new Set();
-    const add = (url, type, label, sublabel = "") => {
-      if (!url || typeof url !== "string") return;
-      const t = url.trim();
-      if (!t || seen.has(t)) return;
-      seen.add(t);
-      list.push({ url: t, type, label, sublabel });
-    };
-
-    if (competition?.imageUrl) {
-      add(competition.imageUrl, "main", "মূল ব্যানার ছবি", "Main Banner");
-    }
-
-    if (Array.isArray(competition?.categoryGroups)) {
-      competition.categoryGroups.forEach((g, idx) => {
-        if (Array.isArray(g.pictures)) {
-          g.pictures.forEach((pic, pIdx) => {
-            add(pic, "group", `ক্যাটাগরি: ${g.name || `#${idx + 1}`}`, `গ্রুপ ছবি ${pIdx + 1}`);
-          });
-        }
-      });
-    }
-
-    if (Array.isArray(competition?.galleryImages)) {
-      competition.galleryImages.forEach((img, idx) => {
-        add(img, "other", `সংযুক্ত ছবি #${idx + 1}`, "Competition Photo");
-      });
-    }
-
-    return list;
-  }, [competition]);
-
-  const filteredGallery = useMemo(() => {
-    if (galleryFilter === "all") return linkedGallery;
-    return linkedGallery.filter((item) => item.type === galleryFilter);
-  }, [linkedGallery, galleryFilter]);
 
   const allCount = linkedGallery.length;
   const mainCount = linkedGallery.filter((i) => i.type === "main").length;
@@ -238,18 +251,6 @@ export default function CompetitionDetailsPage() {
   const certCount = linkedGallery.filter((i) => i.type === "certificate").length;
 
   const gallery = linkedGallery.map((item) => item.url);
-  const groups =
-    Array.isArray(competition.categoryGroups) && competition.categoryGroups.length > 0
-      ? competition.categoryGroups
-      : Array.isArray(competition.categories) && competition.categories.length > 0
-      ? competition.categories.map((c) => ({
-          name: c,
-          details: "",
-          criteria: "",
-          rules: "",
-          pictures: [],
-        }))
-      : [{ name: competition.category || "General", details: "", criteria: "", rules: "", pictures: [] }];
 
   const currentGroup = groups[selectedGroupTab] || groups[0];
 

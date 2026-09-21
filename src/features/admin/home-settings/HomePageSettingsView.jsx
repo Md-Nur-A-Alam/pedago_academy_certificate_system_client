@@ -709,7 +709,8 @@ export function HomePageSettingsView() {
                 </div>
 
                 <MultiImageUpload
-                  images={
+                  label="Hero Images"
+                  value={
                     Array.isArray(hero.images) && hero.images.length > 0
                       ? hero.images
                       : hero.imageUrl
@@ -718,13 +719,10 @@ export function HomePageSettingsView() {
                   }
                   onChange={(newImages) => {
                     handleHeroChange("images", newImages);
-                    if (newImages.length > 0) {
-                      handleHeroChange("imageUrl", newImages[0]);
-                    }
+                    handleHeroChange("imageUrl", newImages.length > 0 ? newImages[0] : "");
                   }}
                   maxImages={10}
-                  title="Hero Slideshow Gallery"
-                  helperText="Add up to 10 images. They will smoothly rotate one by one after your chosen stay time."
+                  helpText="Add up to 10 images. They will smoothly rotate one by one after your chosen stay time."
                 />
 
                 {/* Slideshow Stay Time & Transition Controls */}

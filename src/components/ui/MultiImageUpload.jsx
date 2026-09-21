@@ -20,13 +20,18 @@ import { toast } from "react-toastify";
 
 export function MultiImageUpload({
   label = "Images",
-  value = [],
+  value,
+  images: propImages,
   onChange,
   maxImages = 5,
   error,
   helpText,
 }) {
-  const images = Array.isArray(value) ? value : [];
+  const images = Array.isArray(value)
+    ? value
+    : Array.isArray(propImages)
+    ? propImages
+    : [];
   const [tab, setTab] = useState("file"); // 'file' | 'url'
   const [urlInput, setUrlInput] = useState("");
   const [isUploading, setIsUploading] = useState(false);
@@ -73,7 +78,8 @@ export function MultiImageUpload({
     }
 
     if (uploadedUrls.length > 0) {
-      onChange([...images, ...uploadedUrls]);
+      const updated = [...images, ...uploadedUrls];
+      onChange?.(updated);
       toast.success(
         `${uploadedUrls.length} image${uploadedUrls.length > 1 ? "s" : ""} uploaded successfully!`
       );
@@ -111,7 +117,8 @@ export function MultiImageUpload({
 
       const importedUrl = data?.data?.url;
       if (importedUrl) {
-        onChange([...images, importedUrl]);
+        const updated = [...images, importedUrl];
+        onChange?.(updated);
         setUrlInput("");
         toast.success("Image imported and hosted successfully!");
       }
@@ -128,7 +135,8 @@ export function MultiImageUpload({
 
   const handleRemoveImage = (indexToRemove) => {
     const updated = images.filter((_, idx) => idx !== indexToRemove);
-    onChange(updated);
+    onChange?.(updated);
+    toast.info("Image removed");
   };
 
   return (
@@ -208,7 +216,7 @@ export function MultiImageUpload({
                         Drop image here or click to browse (up to {maxImages - images.length} more)
                       </p>
                       <p className="text-[10px] text-gray-400">
-                        PNG, JPG, WebP, GIF (Fast & Secure Storage)
+                        PNG, JPG, WebP, GIF (Fast & Secure Cloud Storage)
                       </p>
                     </div>
                   </>
@@ -260,50 +268,66 @@ export function MultiImageUpload({
 
       {/* Uploaded Images Grid */}
       {images.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 pt-1">
-          {images.map((imgUrl, idx) => (
-            <div
-              key={idx}
-              onClick={() => setPreviewModalUrl(imgUrl)}
-              className="group relative rounded-xl border border-gray-200 overflow-hidden bg-gray-100 aspect-video sm:aspect-square flex items-center justify-center shadow-2xs cursor-pointer hover:border-purple-300 hover:shadow-md transition-all"
-            >
-              <img
-                src={imgUrl}
-                alt={`Uploaded image ${idx + 1}`}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                onError={(e) => {
-                  e.currentTarget.src = "/fallback-image.png";
-                }}
-              />
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPreviewModalUrl(imgUrl);
+        <div className="space-y-2 pt-1">
+          <div className="flex items-center justify-between text-[11px] text-gray-500 font-medium px-0.5">
+            <span>Uploaded Pictures ({images.length})</span>
+            <span className="text-[10px] text-gray-400">Click &apos;X&apos; on any card to remove it</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+            {images.map((imgUrl, idx) => (
+              <div
+                key={idx}
+                className="group relative rounded-xl border-2 border-gray-200 overflow-hidden bg-gray-100 aspect-video sm:aspect-square flex items-center justify-center shadow-xs hover:border-[#29479B] hover:shadow-md transition-all"
+              >
+                <img
+                  src={imgUrl}
+                  alt={`Uploaded image ${idx + 1}`}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  onError={(e) => {
+                    e.currentTarget.src = "/fallback-image.png";
                   }}
-                  className="p-1.5 bg-white/90 hover:bg-white text-gray-800 rounded-lg shadow-sm transition-transform hover:scale-110 cursor-pointer"
-                  title="View details"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                </button>
+                />
+
+                {/* Permanent prominent 1-click Delete button on top-right */}
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleRemoveImage(idx);
                   }}
-                  className="p-1.5 bg-red-600/90 hover:bg-red-600 text-white rounded-lg shadow-sm transition-transform hover:scale-110 cursor-pointer"
-                  title="Remove picture"
+                  className="absolute top-1.5 right-1.5 z-20 w-6 h-6 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-md flex items-center justify-center transition-transform hover:scale-115 active:scale-95 cursor-pointer"
+                  title="Remove this image"
+                  aria-label="Remove image"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-3.5 h-3.5 stroke-[2.5]" />
                 </button>
+
+                {/* Hover overlay with Eye details button */}
+                <div
+                  onClick={() => setPreviewModalUrl(imgUrl)}
+                  className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 cursor-pointer z-10"
+                >
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPreviewModalUrl(imgUrl);
+                    }}
+                    className="p-1.5 bg-white/95 hover:bg-white text-gray-800 rounded-lg shadow-sm transition-transform hover:scale-110 cursor-pointer flex items-center gap-1 text-[10px] font-bold"
+                    title="View details"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-[#29479B]" />
+                    <span>View</span>
+                  </button>
+                </div>
+
+                {/* Image Sequence Badge */}
+                <span className="absolute bottom-1.5 left-1.5 z-20 px-1.5 py-0.5 rounded text-[9px] font-bold bg-black/70 text-white backdrop-blur-xs">
+                  {idx === 0 ? "★ #1 (Main)" : `#${idx + 1}`}
+                </span>
               </div>
-              <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-black/60 text-white backdrop-blur-2xs">
-                #{idx + 1}
-              </span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       ) : (
         <div className="flex items-center gap-2 text-gray-400 text-xs py-1">
