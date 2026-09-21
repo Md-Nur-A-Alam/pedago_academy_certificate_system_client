@@ -152,7 +152,7 @@ export function AdminProfileSettings() {
               Profile Photo
             </label>
             <p className="text-xs text-gray-500 mb-3">
-              Upload a professional portrait or avatar. Automatically hosted on ImgBB.
+              Upload a professional portrait or avatar. Automatically hosted on ImgBB / Postimages.
             </p>
             <ImageUpload
               value={photoValue}

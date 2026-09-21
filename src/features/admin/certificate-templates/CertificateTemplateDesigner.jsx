@@ -323,7 +323,7 @@ export function CertificateTemplateDesigner({ initialTemplate, onBack, onSaved }
             Step 3: Upload Certificate Design (Background Image) *
           </label>
           <p className="text-xs text-gray-500 mt-0.5">
-            Upload the high-resolution certificate artwork (recommended 1920×1080 or A4 ratio). Hosted automatically on ImgBB.
+            Upload the high-resolution certificate artwork (recommended 1920×1080 or A4 ratio). Hosted automatically on ImgBB / Postimages.
           </p>
         </div>
 

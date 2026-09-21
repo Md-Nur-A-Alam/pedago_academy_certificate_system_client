@@ -55,14 +55,7 @@ export function PublicNavbar() {
           </Link>
         </nav>
 
-        <div className="flex items-center gap-4">
-          <Link
-            href="/admin/login"
-            className="px-4 py-2 text-sm font-semibold rounded-lg bg-[#29479B] hover:bg-[#1A284A] text-white border border-white/20 transition-all shadow-sm"
-          >
-            Admin Portal
-          </Link>
-        </div>
+
       </div>
     </header>
   );

@@ -38,18 +38,14 @@ export function ImageUpload({
     try {
       const { data } = await apiClient.post("/api/upload", formData, {
         headers: {
-          "Content-Type": "multipart/form-data",
+          "Content-Type": undefined,
         },
       });
 
       const uploadedUrl = data?.data?.url;
       if (uploadedUrl) {
         onChange(uploadedUrl);
-        toast.success(
-          data?.data?.provider === "imgbb"
-            ? "Image uploaded and hosted on ImgBB!"
-            : "Image uploaded and saved to server storage."
-        );
+        toast.success("Image uploaded successfully!");
       }
     } catch (err) {
       const msg =
@@ -87,7 +83,7 @@ export function ImageUpload({
       if (importedUrl) {
         onChange(importedUrl);
         setUrlInput("");
-        toast.success("Image imported and hosted on ImgBB!");
+        toast.success("Image imported and hosted successfully!");
       }
     } catch (err) {
       const msg =
@@ -196,7 +192,7 @@ export function ImageUpload({
               <>
                 <Loader2 className="w-7 h-7 text-[#29479B] animate-spin" />
                 <p className="text-xs font-medium text-gray-600">
-                  Uploading image to ImgBB...
+                  Uploading image...
                 </p>
               </>
             ) : (
@@ -209,7 +205,7 @@ export function ImageUpload({
                     Click to upload or drag and drop
                   </p>
                   <p className="text-[11px] text-gray-400 mt-0.5">
-                    PNG, JPG, WebP or GIF (Hosted on ImgBB)
+                    PNG, JPG, WebP or GIF (Fast & Secure Storage)
                   </p>
                 </div>
               </>
@@ -245,18 +241,18 @@ export function ImageUpload({
               {isImporting ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Hosting...</span>
+                  <span>Importing...</span>
                 </>
               ) : (
                 <>
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>Import to ImgBB</span>
+                  <span>Import Image</span>
                 </>
               )}
             </button>
           </div>
           <p className="text-[11px] text-gray-400 leading-relaxed">
-            💡 <strong>Facebook Tip:</strong> Right-click the photo on Facebook, choose <span className="text-gray-600 font-medium">&quot;Copy image address&quot;</span>, and paste here. Our server will save it to ImgBB permanently so the link never expires.
+            💡 <strong>Facebook Tip:</strong> Right-click the photo on Facebook, choose <span className="text-gray-600 font-medium">&quot;Copy image address&quot;</span>, and paste here. Our server will save and host it permanently so the link never expires.
           </p>
         </div>
       )}

@@ -60,7 +60,6 @@ export function PublicFooter() {
             <ul className="space-y-2 text-sm">
               <li><Link href="/certificates" className="hover:text-[#F59E0B] transition-colors">Verify Certificate</Link></li>
               <li><Link href="/contact" className="hover:text-[#F59E0B] transition-colors">Support & Help</Link></li>
-              <li><Link href="/admin/login" className="hover:text-[#F59E0B] transition-colors">Administrator Access</Link></li>
             </ul>
           </div>
 

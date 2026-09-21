@@ -185,7 +185,7 @@ export function ParticipantForm({ initialData, onSubmit, onClose, isLoading }) {
           Media Link or Upload (Optional)
         </label>
         <p className="text-xs text-gray-500 mb-2">
-          Upload participant&apos;s photo or media file (auto-hosted on ImgBB), or paste an external URL directly.
+          Upload participant&apos;s photo or media file (auto-hosted on ImgBB / Postimages), or paste an external URL directly.
         </p>
         <ImageUpload
           value={mediaUrl}

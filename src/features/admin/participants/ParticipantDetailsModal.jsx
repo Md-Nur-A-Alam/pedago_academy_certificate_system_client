@@ -88,6 +88,9 @@ function isImageUrl(url = "") {
   return (
     /\.(jpeg|jpg|gif|png|webp|svg|bmp)(\?.*)?$/i.test(url) ||
     url.includes("i.ibb.co") ||
+    url.includes("i.postimg.cc") ||
+    url.includes("postimg.cc") ||
+    url.includes("postimages.org") ||
     url.includes("imgur.com") ||
     url.includes("cloudinary.com") ||
     url.includes("/uploads/")
@@ -477,13 +480,13 @@ export function ParticipantDetailsModal({ isOpen, onClose, participant, onUpdate
                   <UploadCloud className="w-4 h-4 text-purple-600" />
                   Upload or Select New Participant Media
                 </span>
-                <span className="text-[11px] text-gray-400">Auto-hosted on ImgBB</span>
+                <span className="text-[11px] text-gray-400">Cloud Hosted (ImgBB / Postimages)</span>
               </div>
 
               <ImageUpload
                 value={mediaUrlInput}
                 onChange={setMediaUrlInput}
-                helpText="Drag and drop photo, select file (ImgBB), or paste direct/Facebook image URL"
+                helpText="Drag and drop photo, select file (ImgBB / Postimages), or paste direct/Facebook image URL"
               />
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-purple-200/50">

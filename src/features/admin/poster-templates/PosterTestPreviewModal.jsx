@@ -265,7 +265,7 @@ export function PosterTestPreviewModal({ isOpen, onClose, template }) {
             <ImageUpload
               value={testPhoto}
               onChange={(url) => setTestPhoto(url || DEFAULT_SAMPLE_PHOTO)}
-              helpText="Upload a portrait photo (hosted on ImgBB) or paste image link to test circle/square/rounded cutouts"
+              helpText="Upload a portrait photo (hosted on ImgBB / Postimages) or paste image link to test circle/square/rounded cutouts"
             />
           </div>
         </div>

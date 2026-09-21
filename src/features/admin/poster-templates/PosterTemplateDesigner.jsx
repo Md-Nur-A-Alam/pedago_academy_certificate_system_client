@@ -275,7 +275,7 @@ export function PosterTemplateDesigner({ initialTemplate, onBack, onSaved }) {
             Step 3: Upload Poster Artwork (Background Image) *
           </label>
           <p className="text-xs text-gray-500 mt-0.5">
-            Upload the high-resolution portrait poster design (recommended 1200×1600 or 1080×1350 for social media). Auto-hosted on ImgBB.
+            Upload the high-resolution portrait poster design (recommended 1200×1600 or 1080×1350 for social media). Auto-hosted on ImgBB / Postimages.
           </p>
         </div>
 

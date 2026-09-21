@@ -2,12 +2,12 @@
 
 import React from "react";
 
-export function Modal({ isOpen, onClose, title, children }) {
+export function Modal({ isOpen, onClose, title, children, maxWidth = "max-w-lg" }) {
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden border border-gray-100">
+      <div className={`bg-white rounded-xl shadow-xl w-full ${maxWidth} overflow-hidden border border-gray-100`}>
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <h3 className="text-lg font-bold text-[#1A284A]">{title}</h3>
           <button

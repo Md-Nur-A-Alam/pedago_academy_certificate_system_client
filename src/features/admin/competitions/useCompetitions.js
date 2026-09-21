@@ -26,6 +26,8 @@ export function useCompetitions(params = {}) {
     onSuccess: () => {
       toast.success("Competition created successfully");
       queryClient.invalidateQueries({ queryKey: ["competitions"] });
+      queryClient.invalidateQueries({ queryKey: ["competition-topics"] });
+      queryClient.invalidateQueries({ queryKey: ["public-competitions"] });
     },
     onError: (err) => {
       const msg = err.response?.data?.message || err.message || "Failed to create competition";
@@ -43,6 +45,8 @@ export function useCompetitions(params = {}) {
     onSuccess: () => {
       toast.success("Competition updated successfully");
       queryClient.invalidateQueries({ queryKey: ["competitions"] });
+      queryClient.invalidateQueries({ queryKey: ["competition-topics"] });
+      queryClient.invalidateQueries({ queryKey: ["public-competitions"] });
     },
     onError: (err) => {
       const msg = err.response?.data?.message || err.message || "Failed to update competition";
@@ -60,6 +64,8 @@ export function useCompetitions(params = {}) {
     onSuccess: () => {
       toast.success("Competition archived successfully");
       queryClient.invalidateQueries({ queryKey: ["competitions"] });
+      queryClient.invalidateQueries({ queryKey: ["competition-topics"] });
+      queryClient.invalidateQueries({ queryKey: ["public-competitions"] });
     },
     onError: (err) => {
       const msg = err.response?.data?.message || err.message || "Failed to archive competition";

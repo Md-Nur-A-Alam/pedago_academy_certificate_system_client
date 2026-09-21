@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Edit, Trash2, Plus, Search } from "lucide-react";
+import Link from "next/link";
+import { Edit, Trash2, Plus, Search, ExternalLink } from "lucide-react";
 import { useCompetitions } from "./useCompetitions";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -154,9 +155,17 @@ export function CompetitionsTable() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <Link
+                          href={`/competitions/${comp._id}`}
+                          target="_blank"
+                          className="p-1.5 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors"
+                          title="View Public Details"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </Link>
                         <button
                           onClick={() => handleOpenEdit(comp)}
-                          className="p-1.5 text-gray-500 hover:text-[#29479B] hover:bg-gray-100 rounded-md transition-colors"
+                          className="p-1.5 text-gray-500 hover:text-[#29479B] hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
                           title="Edit Competition"
                         >
                           <Edit className="w-4 h-4" />
@@ -164,7 +173,7 @@ export function CompetitionsTable() {
                         <button
                           onClick={() => handleArchive(comp._id)}
                           disabled={isArchiving}
-                          className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50"
+                          className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50 cursor-pointer"
                           title="Archive Competition"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -182,7 +191,8 @@ export function CompetitionsTable() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={selectedCompetition ? "Edit Competition" : "Create New Competition"}
+        maxWidth="max-w-4xl"
+        title={selectedCompetition ? "Edit Competition Details" : "Create New Competition"}
       >
         <CompetitionForm
           initialData={selectedCompetition}
