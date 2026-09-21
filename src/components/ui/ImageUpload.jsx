@@ -10,6 +10,9 @@ import {
   ExternalLink,
   Loader2,
   Sparkles,
+  Eye,
+  Copy,
+  Check,
 } from "lucide-react";
 import apiClient from "@/lib/api-client";
 import { toast } from "react-toastify";
@@ -25,6 +28,8 @@ export function ImageUpload({
   const [urlInput, setUrlInput] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // File Dropzone handling
   const onDrop = async (acceptedFiles) => {
@@ -136,46 +141,189 @@ export function ImageUpload({
         </div>
       )}
 
-      {/* If an image is selected / uploaded */}
+      {/* If an image is selected / uploaded - Card style preview with thumbnail */}
       {value ? (
-        <div className="relative group p-3 bg-gray-50 rounded-xl border border-gray-200/80 flex items-center gap-3">
-          <div className="w-16 h-16 rounded-lg bg-gray-200 overflow-hidden shrink-0 border border-gray-200 relative">
-            <img
-              src={value}
-              alt="Uploaded preview"
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                e.currentTarget.src = "/fallback-image.png";
-              }}
-            />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-semibold text-gray-800 truncate flex items-center gap-1.5">
-              <span className="truncate">{value}</span>
+        <>
+          <div
+            onClick={() => setIsPreviewModalOpen(true)}
+            className="group relative p-3.5 bg-white hover:bg-slate-50/70 rounded-2xl border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all duration-200 flex items-center gap-3.5 cursor-pointer"
+          >
+            {/* Thumbnail */}
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-gray-100 overflow-hidden shrink-0 border border-gray-200 relative group-hover:shadow-xs transition-all">
+              <img
+                src={value}
+                alt="Uploaded preview"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                onError={(e) => {
+                  e.currentTarget.src = "/fallback-image.png";
+                }}
+              />
+              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <Eye className="w-5 h-5 text-white drop-shadow-sm" />
+              </div>
+            </div>
+
+            {/* Thumbnail Details Card */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-purple-100 text-purple-800">
+                  {value.includes("postimg")
+                    ? "Postimages"
+                    : value.includes("ibb.co")
+                    ? "ImgBB"
+                    : "Cloud Storage"}
+                </span>
+                <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  Ready
+                </span>
+              </div>
+              <p className="text-xs font-semibold text-gray-800 truncate mt-1 group-hover:text-[#29479B] transition-colors font-mono">
+                {value}
+              </p>
+              <div className="flex items-center gap-2 mt-1.5 text-[11px] text-[#29479B] font-bold">
+                <span className="flex items-center gap-1 hover:underline">
+                  <Eye className="w-3.5 h-3.5" />
+                  ক্লিক করে বড় করে দেখুন (View Details)
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
               <a
                 href={value}
                 target="_blank"
                 rel="noreferrer"
-                className="text-gray-400 hover:text-blue-600 transition-colors shrink-0"
+                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
                 title="Open in new tab"
               >
-                <ExternalLink className="w-3.5 h-3.5" />
+                <ExternalLink className="w-4 h-4" />
               </a>
-            </div>
-            <div className="text-[11px] text-emerald-600 font-medium mt-0.5 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              Hosted & ready to use
+              <button
+                type="button"
+                onClick={handleRemove}
+                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                title="Remove image"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleRemove}
-            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-            title="Remove image"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+
+          {/* Details & Full Preview Modal */}
+          {isPreviewModalOpen && (
+            <div
+              className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+              onClick={() => setIsPreviewModalOpen(false)}
+            >
+              <div
+                className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full border border-gray-100 overflow-hidden my-6 max-h-[92vh] flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="p-5 bg-gradient-to-r from-slate-50 via-purple-50/40 to-slate-50 border-b border-gray-100 flex items-center justify-between gap-3 shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
+                      <ImageIcon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-extrabold text-[#1A284A]">
+                        ইমেজ প্রিভিউ ও তথ্য (Image Preview)
+                      </h3>
+                      <p className="text-[11px] text-gray-500">
+                        {value.includes("postimg")
+                          ? "Hosted on Postimages"
+                          : value.includes("ibb.co")
+                          ? "Hosted on ImgBB"
+                          : "Cloud Hosted"}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsPreviewModalOpen(false)}
+                    className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                    title="Close"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Modal Body - Image Preview */}
+                <div className="p-5 overflow-y-auto space-y-4">
+                  <div className="rounded-2xl overflow-hidden bg-slate-100 border border-gray-200 flex items-center justify-center max-h-[60vh]">
+                    <img
+                      src={value}
+                      alt="Full image preview"
+                      className="max-h-[60vh] w-auto max-w-full object-contain mx-auto"
+                    />
+                  </div>
+
+                  {/* Direct Link & Copy */}
+                  <div className="p-3 bg-gray-50 rounded-xl border border-gray-200/80 space-y-2">
+                    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">
+                      Direct Hotlink / URL
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={value}
+                        className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-mono text-gray-700 select-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(value);
+                          setCopied(true);
+                          toast.success("Link copied to clipboard!");
+                          setTimeout(() => setCopied(false), 2000);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1A284A] hover:bg-[#29479B] text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0"
+                      >
+                        {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copied ? "Copied!" : "Copy"}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-3 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleRemove();
+                      setIsPreviewModalOpen(false);
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                  >
+                    ছবিটি মুছে ফেলুন (Remove)
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={value}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-white hover:bg-gray-100 text-[#1A284A] border border-gray-200 transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>নতুন ট্যাবে খুলুন</span>
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setIsPreviewModalOpen(false)}
+                      className="px-5 py-2 rounded-xl text-xs font-bold bg-[#1A284A] hover:bg-[#29479B] text-white transition-colors cursor-pointer shadow-xs"
+                    >
+                      বন্ধ করুন
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       ) : tab === "file" ? (
         /* File Dropzone View */
         <div

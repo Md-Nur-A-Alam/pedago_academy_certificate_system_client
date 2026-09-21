@@ -1,7 +1,7 @@
 "use client";
 "use no memo";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -50,7 +50,7 @@ const competitionFormSchema = z.object({
   allParticipantPrize: z.string().optional().default(""),
   mainRules: z.string().optional().default(""),
   mainCriteria: z.string().optional().default(""),
-  galleryImages: z.array(z.string()).max(5, "Maximum 5 gallery pictures").default([]),
+  galleryImages: z.array(z.string()).optional().default([]),
 });
 
 export function CompetitionForm({ initialData, onSubmit, onClose, isLoading }) {
@@ -317,7 +317,7 @@ export function CompetitionForm({ initialData, onSubmit, onClose, isLoading }) {
       topicTypes: finalTopicTypes,
       minAge: Number(data.minAge) || 0,
       maxAge: Number(data.maxAge) || 0,
-      galleryImages: Array.isArray(data.galleryImages) ? data.galleryImages.slice(0, 5) : [],
+      galleryImages: Array.isArray(data.galleryImages) && data.galleryImages.length > 0 ? data.galleryImages : (initialData?.galleryImages || []),
       startDate: data.startDate || "",
       endDate: data.endDate || "",
       resultPublishDate: data.resultPublishDate || "",
@@ -339,6 +339,48 @@ export function CompetitionForm({ initialData, onSubmit, onClose, isLoading }) {
 
   const galleryImages = watch("galleryImages") || [];
   const providesCertificate = watch("providesCertificate");
+  const formMainImg = watch("imageUrl");
+  const formGroups = watch("categoryGroups") || [];
+
+  // Automatically aggregate all pictures linked to this competition
+  const allLinkedItems = useMemo(() => {
+    const list = [];
+    const seen = new Set();
+    const add = (url, source, type) => {
+      if (!url || typeof url !== "string") return;
+      const t = url.trim();
+      if (!t || seen.has(t)) return;
+      seen.add(t);
+      list.push({ url: t, source, type });
+    };
+
+    if (formMainImg) {
+      add(formMainImg, "মূল ব্যানার ছবি (Main Banner)", "main");
+    }
+
+    formGroups.forEach((g, gIdx) => {
+      const gName = g?.name || `গ্রুপ #${gIdx + 1}`;
+      if (Array.isArray(g?.pictures)) {
+        g.pictures.forEach((pic, pIdx) => {
+          add(pic, `ক্যাটাগরি: ${gName} (ছবি ${pIdx + 1})`, "group");
+        });
+      }
+    });
+
+    if (Array.isArray(initialData?.linkedGallery)) {
+      initialData.linkedGallery.forEach((item) => {
+        add(item.url, item.label || "টেমপ্লেট ব্যাকগ্রাউন্ড", item.type);
+      });
+    }
+
+    if (Array.isArray(initialData?.galleryImages)) {
+      initialData.galleryImages.forEach((url, idx) => {
+        add(url, `সংযুক্ত ছবি #${idx + 1}`, "other");
+      });
+    }
+
+    return list;
+  }, [formMainImg, formGroups, initialData]);
 
   return (
     <form
@@ -383,7 +425,7 @@ export function CompetitionForm({ initialData, onSubmit, onClose, isLoading }) {
           }`}
         >
           <FileText className="w-4 h-4 text-[#29479B]" />
-          <span>Rules & Gallery ({galleryImages.length}/5)</span>
+          <span>Rules & Auto Gallery ({allLinkedItems.length})</span>
         </button>
 
         <button
@@ -758,29 +800,63 @@ export function CompetitionForm({ initialData, onSubmit, onClose, isLoading }) {
             />
           </div>
 
-          {/* Pictures Gallery (up to 5 pictures) */}
-          <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200/80 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-[#29479B]/10 text-[#29479B] flex items-center justify-center">
-                <ImageIcon className="w-4 h-4" />
+          {/* Auto-Linked Pictures Gallery Showcase */}
+          <div className="p-5 bg-gradient-to-br from-blue-50/70 to-slate-50 rounded-2xl border border-blue-200/80 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-blue-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#29479B] text-white flex items-center justify-center shadow-xs">
+                  <ImageIcon className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-[#1A284A]">
+                    স্বয়ংক্রিয় ছবি গ্যালারি (Auto-Linked Competition Gallery)
+                  </h4>
+                  <p className="text-[11px] text-gray-500">
+                    গ্যালারিতে অতিরিক্ত ছবি আপলোড করার প্রয়োজন নেই।
+                  </p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-xs font-bold text-[#1A284A]">
-                  Pictures Gallery (গ্যালারি - সর্বোচ্চ ৫টি ছবি)
-                </h4>
-                <p className="text-[11px] text-gray-500">
-                  Upload up to 5 photos of past events, winners, venue, or posters
-                </p>
-              </div>
+              <span className="text-xs font-mono font-bold text-[#29479B] bg-blue-100/90 px-3 py-1 rounded-full border border-blue-200/80 self-start sm:self-auto">
+                মোট {allLinkedItems.length} টি ছবি সংযুক্ত
+              </span>
             </div>
 
-            <MultiImageUpload
-              label="Gallery Photos"
-              value={watch("galleryImages")}
-              onChange={(urls) => setValue("galleryImages", urls, { shouldValidate: true })}
-              maxImages={5}
-              helpText="Drop images here or paste image links. Stored permanently on ImgBB / Postimages."
-            />
+            <div className="text-xs text-slate-600 bg-white/90 p-3 rounded-xl border border-blue-100/80 leading-relaxed shadow-2xs">
+              💡 <strong>স্বয়ংক্রিয় ছবির সংযোগ ব্যবস্থা:</strong> এই প্রতিযোগিতার সাথে যে কোনোভাবে যুক্ত সকল ছবি যেমন— 
+              <strong> মূল ব্যানার কভার ছবি</strong>, <strong>সকল ক্যাটাগরি বা গ্রুপের নমুনা/রেফারেন্স ছবি</strong>, এবং এই প্রতিযোগিতার জন্য সিস্টেমে আপলোডকৃত 
+              <strong> পোস্টার টেমপ্লেট</strong> ও <strong>সার্টিফিকেট টেমপ্লেট</strong> স্বয়ংক্রিয়ভাবে গ্যালারিতে অন্তর্ভুক্ত হবে।
+            </div>
+
+            {allLinkedItems.length > 0 ? (
+              <div className="space-y-2 pt-1">
+                <span className="text-[11px] font-bold text-gray-700 block">
+                  বর্তমানে সংযুক্ত ছবি সমূহের প্রিভিউ ({allLinkedItems.length}):
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+                  {allLinkedItems.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="group relative rounded-xl overflow-hidden border border-gray-200 bg-white shadow-2xs aspect-square"
+                    >
+                      <img
+                        src={item.url}
+                        alt=""
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-x-0 bottom-0 bg-black/75 backdrop-blur-2xs px-1.5 py-1 text-center">
+                        <span className="text-[9px] font-semibold text-white truncate block">
+                          {item.source}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-amber-800 bg-amber-50/80 p-3 rounded-xl border border-amber-200/80">
+                ℹ️ এখনো কোনো ছবি সংযুক্ত হয়নি। &quot;Basic & Schedule&quot; ট্যাবে মূল কভার ছবি অথবা &quot;Groups&quot; ট্যাবে ক্যাটাগরির ছবি আপলোড করলে সেগুলি স্বয়ংক্রিয়ভাবে এখানে এবং পাবলিক গ্যালারিতে দেখাবে।
+              </p>
+            )}
           </div>
         </div>
       )}

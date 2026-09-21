@@ -10,6 +10,18 @@ export function useCurrentAdmin() {
   const currentAdminQuery = useQuery({
     queryKey: ["current-admin"],
     queryFn: async () => {
+      if (typeof document !== "undefined") {
+        const hasSessionCookie =
+          document.cookie.includes("better-auth.session_token") ||
+          document.cookie.includes("__Secure-better-auth.session_token") ||
+          document.cookie.includes("better_auth.session_token");
+
+        // If on a public route and no admin session cookie, return null immediately
+        if (!hasSessionCookie && typeof window !== "undefined" && !window.location.pathname.startsWith("/admin")) {
+          return null;
+        }
+      }
+
       try {
         const { data } = await apiClient.get("/api/admins/me");
         return data.data;
@@ -21,7 +33,10 @@ export function useCurrentAdmin() {
       }
     },
     staleTime: 1000 * 60 * 5, // 5 minutes cache
-    retry: 1,
+    retry: (failureCount, error) => {
+      if (error?.response?.status === 401) return false;
+      return failureCount < 1;
+    },
   });
 
   const changePasswordMutation = useMutation({

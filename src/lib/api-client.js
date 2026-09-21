@@ -53,15 +53,29 @@ apiClient.interceptors.response.use(
       error.message ||
       "An unexpected network or server error occurred";
 
-    console.error(`[CLIENT API DEBUG Error] ${status || "NETWORK_ERR"} ${url}:`, {
-      status,
-      message,
-      responseData: error.response?.data,
-    });
+    // If 401 on an unauthenticated session check (/api/admins/me), log as debug to avoid console error clutter
+    const isAuthStatusCheck = url?.includes("/api/admins/me");
+    if (status === 401 && isAuthStatusCheck) {
+      console.debug(`[CLIENT API Auth Check] 401 ${url} (No active admin session)`);
+    } else {
+      console.error(`[CLIENT API DEBUG Error] ${status || "NETWORK_ERR"} ${url}:`, {
+        status,
+        message,
+        responseData: error.response?.data,
+      });
+    }
 
     if (status === 401) {
-      if (typeof window !== "undefined" && !window.location.pathname.includes("/admin/login")) {
-        console.warn("[CLIENT API DEBUG 401 Unauthorized] Session invalid, redirecting to /admin/login...");
+      // Never redirect visitors on public routes (/competitions, /certificates, /, etc.)
+      // Only redirect if actively accessing a protected /admin area and not already on the login page
+      const isAuthStatusCheck = url?.includes("/api/admins/me");
+      if (
+        typeof window !== "undefined" &&
+        window.location.pathname.startsWith("/admin") &&
+        !window.location.pathname.includes("/admin/login") &&
+        !isAuthStatusCheck
+      ) {
+        console.warn("[CLIENT API DEBUG 401 Unauthorized] Session invalid on admin route, redirecting to /admin/login...");
         window.location.href = "/admin/login";
       }
     }

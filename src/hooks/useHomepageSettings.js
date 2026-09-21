@@ -18,6 +18,11 @@ const DEFAULT_HOMEPAGE_SETTINGS = {
     subtitleColor: "rgba(255, 255, 255, 0.9)",
     layoutMode: "background", // 'background' | 'flex'
     imageUrl: "/HeroBG.jpg",
+    images: ["/HeroBG.jpg"],
+    stayTime: 5,
+    transitionEffect: "fade", // 'fade' | 'slide' | 'zoom' | 'kenburns'
+    showIndicators: true,
+    showNavigation: true,
     bgOverlayColor: "#1A284A",
     bgType: "solid", // 'solid' | 'gradient'
     bgSolidColor: "#1A284A",
@@ -130,6 +135,23 @@ export function useHomepageSettings() {
       hero: {
         ...DEFAULT_HOMEPAGE_SETTINGS.hero,
         ...(data.hero || {}),
+        images:
+          Array.isArray(data.hero?.images) && data.hero.images.length > 0
+            ? data.hero.images
+            : data.hero?.imageUrl
+              ? [data.hero.imageUrl]
+              : DEFAULT_HOMEPAGE_SETTINGS.hero.images,
+        stayTime: data.hero?.stayTime ?? DEFAULT_HOMEPAGE_SETTINGS.hero.stayTime,
+        transitionEffect:
+          data.hero?.transitionEffect || DEFAULT_HOMEPAGE_SETTINGS.hero.transitionEffect,
+        showIndicators:
+          data.hero?.showIndicators !== undefined
+            ? data.hero.showIndicators
+            : DEFAULT_HOMEPAGE_SETTINGS.hero.showIndicators,
+        showNavigation:
+          data.hero?.showNavigation !== undefined
+            ? data.hero.showNavigation
+            : DEFAULT_HOMEPAGE_SETTINGS.hero.showNavigation,
         bgGradient: {
           ...DEFAULT_HOMEPAGE_SETTINGS.hero.bgGradient,
           ...(data.hero?.bgGradient || {}),

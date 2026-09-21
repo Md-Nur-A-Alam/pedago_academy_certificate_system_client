@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -40,6 +40,7 @@ export default function CompetitionDetailsPage() {
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedGroupTab, setSelectedGroupTab] = useState(0);
+  const [activeGroupModal, setActiveGroupModal] = useState(null); // { group, index }
   const [lightboxImage, setLightboxImage] = useState(null); // url string or null
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxList, setLightboxList] = useState([]); // array of urls
@@ -88,21 +89,60 @@ export default function CompetitionDetailsPage() {
   const openLightbox = (imageList, index) => {
     setLightboxList(imageList);
     setLightboxIndex(index);
-    setLightboxImage(imageList[index]);
+    const item = imageList[index];
+    setLightboxImage(typeof item === "string" ? item : item?.url || "");
   };
 
   const handleNextImage = () => {
     if (lightboxList.length === 0) return;
     const nextIdx = (lightboxIndex + 1) % lightboxList.length;
     setLightboxIndex(nextIdx);
-    setLightboxImage(lightboxList[nextIdx]);
+    const item = lightboxList[nextIdx];
+    setLightboxImage(typeof item === "string" ? item : item?.url || "");
   };
 
   const handlePrevImage = () => {
     if (lightboxList.length === 0) return;
     const prevIdx = (lightboxIndex - 1 + lightboxList.length) % lightboxList.length;
     setLightboxIndex(prevIdx);
-    setLightboxImage(lightboxList[prevIdx]);
+    const item = lightboxList[prevIdx];
+    setLightboxImage(typeof item === "string" ? item : item?.url || "");
+  };
+
+  const handleNextGroup = () => {
+    if (!activeGroupModal) return;
+    const nextIdx = (activeGroupModal.index + 1) % groups.length;
+    setActiveGroupModal({ group: groups[nextIdx], index: nextIdx });
+  };
+
+  const handlePrevGroup = () => {
+    if (!activeGroupModal) return;
+    const prevIdx = (activeGroupModal.index - 1 + groups.length) % groups.length;
+    setActiveGroupModal({ group: groups[prevIdx], index: prevIdx });
+  };
+
+  const renderFormattedText = (text) => {
+    if (!text) return null;
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    return parts.map((part, i) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:text-blue-800 underline break-all inline-flex items-center gap-1 font-semibold"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span>{part}</span>
+            <ExternalLink className="w-3 h-3 inline shrink-0" />
+          </a>
+        );
+      }
+      return part;
+    });
   };
 
   if (isLoading) {
@@ -146,7 +186,58 @@ export default function CompetitionDetailsPage() {
 
   const isActive = competition.status === "active";
   const isArchived = competition.status === "archived";
-  const gallery = Array.isArray(competition.galleryImages) ? competition.galleryImages : [];
+  const [galleryFilter, setGalleryFilter] = useState("all");
+
+  // Prepare full linked gallery list with robust fallbacks
+  const linkedGallery = useMemo(() => {
+    if (Array.isArray(competition?.linkedGallery) && competition.linkedGallery.length > 0) {
+      return competition.linkedGallery;
+    }
+    const list = [];
+    const seen = new Set();
+    const add = (url, type, label, sublabel = "") => {
+      if (!url || typeof url !== "string") return;
+      const t = url.trim();
+      if (!t || seen.has(t)) return;
+      seen.add(t);
+      list.push({ url: t, type, label, sublabel });
+    };
+
+    if (competition?.imageUrl) {
+      add(competition.imageUrl, "main", "মূল ব্যানার ছবি", "Main Banner");
+    }
+
+    if (Array.isArray(competition?.categoryGroups)) {
+      competition.categoryGroups.forEach((g, idx) => {
+        if (Array.isArray(g.pictures)) {
+          g.pictures.forEach((pic, pIdx) => {
+            add(pic, "group", `ক্যাটাগরি: ${g.name || `#${idx + 1}`}`, `গ্রুপ ছবি ${pIdx + 1}`);
+          });
+        }
+      });
+    }
+
+    if (Array.isArray(competition?.galleryImages)) {
+      competition.galleryImages.forEach((img, idx) => {
+        add(img, "other", `সংযুক্ত ছবি #${idx + 1}`, "Competition Photo");
+      });
+    }
+
+    return list;
+  }, [competition]);
+
+  const filteredGallery = useMemo(() => {
+    if (galleryFilter === "all") return linkedGallery;
+    return linkedGallery.filter((item) => item.type === galleryFilter);
+  }, [linkedGallery, galleryFilter]);
+
+  const allCount = linkedGallery.length;
+  const mainCount = linkedGallery.filter((i) => i.type === "main").length;
+  const groupCount = linkedGallery.filter((i) => i.type === "group").length;
+  const posterCount = linkedGallery.filter((i) => i.type === "poster").length;
+  const certCount = linkedGallery.filter((i) => i.type === "certificate").length;
+
+  const gallery = linkedGallery.map((item) => item.url);
   const groups =
     Array.isArray(competition.categoryGroups) && competition.categoryGroups.length > 0
       ? competition.categoryGroups
@@ -560,168 +651,478 @@ export default function CompetitionDetailsPage() {
           </div>
         )}
 
-        {/* Section 3: Gallery Pictures (Up to 5 pictures) */}
-        {gallery.length > 0 && (
-          <div className="bg-white rounded-3xl border border-gray-200/90 p-6 sm:p-8 space-y-5 shadow-2xs">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-amber-50 text-[#F59E0B] flex items-center justify-center">
+        {/* Section 3: Competition Linked Photos & Media Gallery */}
+        {linkedGallery.length > 0 && (
+          <div className="bg-white rounded-3xl border border-gray-200/90 p-6 sm:p-8 space-y-6 shadow-2xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-50 text-[#F59E0B] flex items-center justify-center shadow-xs">
                   <Camera className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-extrabold text-[#1A284A]">
-                    ছবি গ্যালারি (Gallery - {gallery.length} Photos)
+                  <h3 className="text-lg sm:text-xl font-extrabold text-[#1A284A]">
+                    প্রতিযোগিতার ছবি গ্যালারি (Gallery - {linkedGallery.length} Linked Photos)
                   </h3>
-                  <p className="text-xs text-gray-500">
-                    প্রতিযোগিতার স্মরণীয় মুহূর্ত ও বিজয়ীদের ছবি (ক্লিক করে বড় করে দেখুন)
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    এই প্রতিযোগিতার সাথে যুক্ত সকল ছবি— মূল ব্যানার, ক্যাটাগরি/গ্রুপের ছবি, পোস্টার ও সার্টিফিকেট টেমপ্লেট
                   </p>
                 </div>
               </div>
+
+              <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/60 self-start sm:self-center flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>স্বয়ংক্রিয়ভাবে সংযুক্ত মিডিয়া</span>
+              </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-              {gallery.map((imgUrl, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => openLightbox(gallery, idx)}
-                  className="group relative rounded-2xl overflow-hidden bg-gray-100 aspect-video sm:aspect-square cursor-pointer border border-gray-200 shadow-2xs hover:shadow-md transition-all"
+            {/* Filter Tabs if multiple sources exist */}
+            {(mainCount > 0 || groupCount > 0 || posterCount > 0 || certCount > 0) && (
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setGalleryFilter("all")}
+                  className={`px-3.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    galleryFilter === "all"
+                      ? "bg-[#29479B] text-white shadow-xs"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
                 >
-                  <img
-                    src={imgUrl}
-                    alt={`Competition photo ${idx + 1}`}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <span className="text-xs font-bold text-white bg-black/60 px-2.5 py-1 rounded-lg backdrop-blur-xs">
-                      বড় করে দেখুন
-                    </span>
+                  সকল ছবি ({allCount})
+                </button>
+
+                {mainCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setGalleryFilter("main")}
+                    className={`px-3.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
+                      galleryFilter === "main"
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    }`}
+                  >
+                    মূল ব্যানার ({mainCount})
+                  </button>
+                )}
+
+                {groupCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setGalleryFilter("group")}
+                    className={`px-3.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
+                      galleryFilter === "group"
+                        ? "bg-purple-600 text-white shadow-xs"
+                        : "bg-purple-50 text-purple-700 hover:bg-purple-100"
+                    }`}
+                  >
+                    ক্যাটাগরি / গ্রুপ ({groupCount})
+                  </button>
+                )}
+
+                {posterCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setGalleryFilter("poster")}
+                    className={`px-3.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
+                      galleryFilter === "poster"
+                        ? "bg-amber-600 text-white shadow-xs"
+                        : "bg-amber-50 text-amber-800 hover:bg-amber-100"
+                    }`}
+                  >
+                    পোস্টার টেমপ্লেট ({posterCount})
+                  </button>
+                )}
+
+                {certCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setGalleryFilter("certificate")}
+                    className={`px-3.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
+                      galleryFilter === "certificate"
+                        ? "bg-emerald-600 text-white shadow-xs"
+                        : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                    }`}
+                  >
+                    সার্টিফিকেট টেমপ্লেট ({certCount})
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Gallery Image Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
+              {filteredGallery.map((item, idx) => {
+                const isMain = item.type === "main";
+                const isGroup = item.type === "group";
+                const isPoster = item.type === "poster";
+                const isCert = item.type === "certificate";
+
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => openLightbox(filteredGallery.map((g) => g.url), idx)}
+                    className="group relative rounded-2xl overflow-hidden bg-gray-100 aspect-4/3 cursor-pointer border border-gray-200/90 shadow-2xs hover:shadow-lg hover:-translate-y-1 transition-all"
+                  >
+                    <img
+                      src={item.url}
+                      alt={item.label || `Competition media ${idx + 1}`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+
+                    {/* Source Category Tag */}
+                    <div className="absolute top-2 left-2 z-10">
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs backdrop-blur-xs ${
+                          isMain
+                            ? "bg-blue-600/90 text-white"
+                            : isGroup
+                            ? "bg-purple-600/90 text-white"
+                            : isPoster
+                            ? "bg-amber-600/90 text-white"
+                            : isCert
+                            ? "bg-emerald-600/90 text-white"
+                            : "bg-black/60 text-white"
+                        }`}
+                      >
+                        {item.label}
+                      </span>
+                    </div>
+
+                    {/* Hover Overlay */}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 p-2 text-center">
+                      <span className="text-xs font-bold text-white bg-black/70 px-2.5 py-1 rounded-lg backdrop-blur-xs">
+                        🔍 বড় করে দেখুন
+                      </span>
+                      {item.sublabel && (
+                        <span className="text-[10px] text-white/80 line-clamp-1">
+                          {item.sublabel}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
 
-        {/* Section 4: Category / Group Breakdown */}
+        {/* Section 4: Category / Group Breakdown - Card Style Preview with Thumbnails */}
         <div className="bg-white rounded-3xl border border-gray-200/90 p-6 sm:p-8 space-y-6 shadow-2xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-gray-100">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shadow-xs">
                 <Layers className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-lg font-extrabold text-[#1A284A]">
+                <h3 className="text-lg sm:text-xl font-black text-[#1A284A]">
                   ক্যাটাগরি ও গ্রুপ ভিত্তিক বিস্তারিত (Categories & Groups)
                 </h3>
-                <p className="text-xs text-gray-500">
-                  মোট {groups.length} টি ক্যাটাগরি / গ্রুপের নির্দিষ্ট নিয়মাবলী ও তথ্য
+                <p className="text-xs text-gray-500 mt-0.5">
+                  মোট {groups.length} টি ক্যাটাগরি / গ্রুপ। কার্ডে ক্লিক করে বিস্তারিত নিয়মাবলী ও তথ্য দেখুন
                 </p>
               </div>
             </div>
 
-            {/* Category selection tabs */}
-            <div className="flex items-center gap-1.5 overflow-x-auto p-1 bg-slate-100 rounded-xl max-w-full">
-              {groups.map((grp, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setSelectedGroupTab(idx)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                    selectedGroupTab === idx
-                      ? "bg-white text-[#1A284A] shadow-xs"
-                      : "text-gray-500 hover:text-gray-900"
-                  }`}
-                >
-                  {grp.name || `Group ${idx + 1}`}
-                </button>
-              ))}
-            </div>
+            <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200/60 self-start sm:self-center flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+              <span>{groups.length} টি ক্যাটাগরি কার্ড</span>
+            </span>
           </div>
 
-          {/* Selected Category Content */}
-          <div className="bg-slate-50/70 rounded-2xl border border-gray-200/80 p-6 space-y-6">
-            <div className="flex items-center justify-between gap-4 flex-wrap pb-3 border-b border-gray-200/60">
-              <div className="flex items-center gap-2.5">
-                <span className="w-7 h-7 rounded-lg bg-[#29479B] text-white text-xs font-bold flex items-center justify-center">
-                  {selectedGroupTab + 1}
-                </span>
-                <h4 className="text-xl font-bold text-[#1A284A]">
-                  {currentGroup.name || `ক্যাটাগরি ${selectedGroupTab + 1}`}
-                </h4>
-              </div>
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-purple-100 text-purple-800">
-                গ্রুপ স্পেসিফিক তথ্য
-              </span>
-            </div>
+          {/* Category Cards Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {groups.map((grp, idx) => {
+              const hasPictures = Array.isArray(grp.pictures) && grp.pictures.length > 0;
+              const thumbnail = hasPictures ? grp.pictures[0] : null;
 
-            {/* Group Details */}
-            {currentGroup.details ? (
-              <div className="space-y-1.5">
-                <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  বিবরণ ও যোগ্যতা (Details & Eligibility)
-                </h5>
-                <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-line bg-white p-4 rounded-xl border border-gray-200/70">
-                  {currentGroup.details}
-                </p>
-              </div>
-            ) : null}
-
-            {/* Group Rules & Criteria Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {currentGroup.rules && (
-                <div className="space-y-1.5">
-                  <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                    গ্রুপের নির্দিষ্ট নিয়মাবলী (Group Rules)
-                  </h5>
-                  <div className="text-sm text-gray-800 leading-relaxed whitespace-pre-line bg-white p-4 rounded-xl border border-gray-200/70">
-                    {currentGroup.rules}
-                  </div>
-                </div>
-              )}
-
-              {currentGroup.criteria && (
-                <div className="space-y-1.5">
-                  <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                    গ্রুপের মূল্যায়ন মানদণ্ড (Group Criteria)
-                  </h5>
-                  <div className="text-sm text-gray-800 leading-relaxed whitespace-pre-line bg-white p-4 rounded-xl border border-gray-200/70">
-                    {currentGroup.criteria}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Group Pictures (up to 2 pictures) */}
-            {Array.isArray(currentGroup.pictures) && currentGroup.pictures.length > 0 && (
-              <div className="space-y-2 pt-2">
-                <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                  <Camera className="w-3.5 h-3.5 text-[#29479B]" />
-                  <span>গ্রুপের নমুনা / রেফারেন্স ছবি ({currentGroup.pictures.length} টি ছবি)</span>
-                </h5>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
-                  {currentGroup.pictures.map((picUrl, pIdx) => (
-                    <div
-                      key={pIdx}
-                      onClick={() => openLightbox(currentGroup.pictures, pIdx)}
-                      className="group relative rounded-2xl overflow-hidden bg-gray-100 aspect-video cursor-pointer border border-gray-200 shadow-2xs hover:shadow-md transition-all"
-                    >
+              return (
+                <div
+                  key={idx}
+                  onClick={() => setActiveGroupModal({ group: grp, index: idx })}
+                  className="group relative bg-white hover:bg-slate-50/70 rounded-2xl border border-gray-200/90 hover:border-purple-300 hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col cursor-pointer transform hover:-translate-y-1"
+                >
+                  {/* Card Thumbnail */}
+                  <div className="relative h-44 w-full overflow-hidden bg-slate-100">
+                    {thumbnail ? (
                       <img
-                        src={picUrl}
-                        alt={`${currentGroup.name} picture ${pIdx + 1}`}
+                        src={thumbnail}
+                        alt={grp.name || `Group ${idx + 1}`}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
-                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span className="text-xs font-bold text-white bg-black/60 px-2.5 py-1 rounded-lg backdrop-blur-xs">
-                          বড় করে দেখুন
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-[#1A284A] via-[#29479B] to-purple-800 flex flex-col items-center justify-center p-4 text-center relative overflow-hidden">
+                        <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/10 blur-md pointer-events-none" />
+                        <div className="absolute -left-6 -top-6 w-20 h-20 rounded-full bg-purple-500/20 blur-sm pointer-events-none" />
+
+                        <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md text-white flex items-center justify-center mb-2 shadow-inner border border-white/20 group-hover:scale-110 transition-transform">
+                          <Layers className="w-6 h-6 text-purple-200" />
+                        </div>
+                        <span className="text-white font-bold text-sm line-clamp-1 drop-shadow-sm px-2">
+                          {grp.name || `গ্রুপ ${idx + 1}`}
+                        </span>
+                        <span className="text-[11px] text-purple-200/90 mt-0.5">
+                          ক্লিক করে বিস্তারিত দেখুন
                         </span>
                       </div>
+                    )}
+
+                    {/* Gradient Overlay for photo thumbnails */}
+                    {thumbnail && (
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none" />
+                    )}
+
+                    {/* Top-left Group Index Badge */}
+                    <div className="absolute top-3 left-3">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black bg-white/95 text-[#1A284A] shadow-md backdrop-blur-xs border border-white/40">
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
+                        গ্রুপ #{idx + 1}
+                      </span>
                     </div>
-                  ))}
+
+                    {/* Top-right Photo Count badge if multiple */}
+                    {hasPictures && (
+                      <div className="absolute top-3 right-3">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-black/60 text-white backdrop-blur-xs border border-white/20">
+                          <Camera className="w-3 h-3" />
+                          {grp.pictures.length}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Bottom overlay title if thumbnail exists */}
+                    {thumbnail && (
+                      <div className="absolute bottom-2.5 left-3 right-3">
+                        <p className="text-xs font-bold text-white/90 line-clamp-1 drop-shadow-sm">
+                          {grp.name || `গ্রুপ ${idx + 1}`}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Card Content */}
+                  <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
+                    <div>
+                      <h4 className="font-extrabold text-[#1A284A] text-base group-hover:text-[#29479B] transition-colors line-clamp-1">
+                        {grp.name || `ক্যাটাগরি ${idx + 1}`}
+                      </h4>
+
+                      {/* Snippet / preview of details */}
+                      {grp.details ? (
+                        <p className="text-xs text-gray-600 mt-1.5 line-clamp-2 leading-relaxed">
+                          {grp.details}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-gray-400 mt-1.5 italic">
+                          গ্রুপের নিয়মাবলী ও মূল্যায়ন মানদণ্ড দেখুন
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Feature indicator pills */}
+                    <div className="pt-2 flex items-center gap-1.5 flex-wrap">
+                      {grp.rules && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                          নিয়মাবলী
+                        </span>
+                      )}
+                      {grp.criteria && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
+                          মূল্যায়ন
+                        </span>
+                      )}
+                      {hasPictures && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-100">
+                          রেফারেন্স ছবি
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Card Footer / Action */}
+                    <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-xs font-bold text-[#29479B] group-hover:text-purple-700 transition-colors">
+                      <span className="flex items-center gap-1">
+                        বিস্তারিত দেখুন
+                      </span>
+                      <span className="transform group-hover:translate-x-1 transition-transform">
+                        →
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })}
           </div>
         </div>
       </div>
+
+      {/* Category / Group Details Modal Popup */}
+      {activeGroupModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+          onClick={() => setActiveGroupModal(null)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full border border-gray-100 overflow-hidden my-8 max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-6 bg-gradient-to-r from-slate-50 via-purple-50/40 to-slate-50 border-b border-gray-100 flex items-start justify-between gap-4 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#29479B] text-white flex items-center justify-center font-bold text-sm shadow-md shrink-0">
+                  {activeGroupModal.index + 1}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                      ক্যাটাগরি / গ্রুপ #{activeGroupModal.index + 1}
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-extrabold text-[#1A284A] mt-1">
+                    {activeGroupModal.group.name || `গ্রুপ ${activeGroupModal.index + 1}`}
+                  </h3>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
+                {groups.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handlePrevGroup}
+                      className="p-2 rounded-xl text-gray-400 hover:text-[#1A284A] hover:bg-gray-100 transition-colors cursor-pointer"
+                      title="পূর্ববর্তী গ্রুপ"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNextGroup}
+                      className="p-2 rounded-xl text-gray-400 hover:text-[#1A284A] hover:bg-gray-100 transition-colors cursor-pointer"
+                      title="পরবর্তী গ্রুপ"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setActiveGroupModal(null)}
+                  className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer ml-1"
+                  title="বন্ধ করুন"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body - Scrollable */}
+            <div className="p-6 overflow-y-auto space-y-6">
+              {/* Pictures if available */}
+              {Array.isArray(activeGroupModal.group.pictures) &&
+                activeGroupModal.group.pictures.length > 0 && (
+                  <div className="space-y-2">
+                    <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                      <Camera className="w-4 h-4 text-[#29479B]" />
+                      <span>নমুনা / রেফারেন্স ছবি ({activeGroupModal.group.pictures.length} টি)</span>
+                    </h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {activeGroupModal.group.pictures.map((pic, pIdx) => (
+                        <div
+                          key={pIdx}
+                          onClick={() => openLightbox(activeGroupModal.group.pictures, pIdx)}
+                          className="group relative rounded-2xl overflow-hidden aspect-video bg-gray-100 border border-gray-200 cursor-pointer shadow-xs hover:shadow-md transition-all"
+                        >
+                          <img
+                            src={pic}
+                            alt={`${activeGroupModal.group.name} picture ${pIdx + 1}`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <span className="text-xs font-bold text-white bg-black/60 px-3 py-1.5 rounded-xl backdrop-blur-xs">
+                              বড় করে দেখুন
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              {/* Details & Eligibility */}
+              {activeGroupModal.group.details && (
+                <div className="space-y-2">
+                  <h5 className="text-xs font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <FileText className="w-4 h-4" />
+                    <span>বিবরণ ও যোগ্যতা (Details & Eligibility)</span>
+                  </h5>
+                  <div className="text-sm text-gray-800 leading-relaxed whitespace-pre-line bg-purple-50/40 p-4 rounded-2xl border border-purple-100">
+                    {renderFormattedText(activeGroupModal.group.details)}
+                  </div>
+                </div>
+              )}
+
+              {/* Rules & Criteria */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {activeGroupModal.group.rules && (
+                  <div className="space-y-2">
+                    <h5 className="text-xs font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>গ্রুপের নির্দিষ্ট নিয়মাবলী (Group Rules)</span>
+                    </h5>
+                    <div className="text-sm text-gray-800 leading-relaxed whitespace-pre-line bg-blue-50/40 p-4 rounded-2xl border border-blue-100">
+                      {renderFormattedText(activeGroupModal.group.rules)}
+                    </div>
+                  </div>
+                )}
+
+                {activeGroupModal.group.criteria && (
+                  <div className="space-y-2">
+                    <h5 className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <Award className="w-4 h-4" />
+                      <span>গ্রুপের মূল্যায়ন মানদণ্ড (Group Criteria)</span>
+                    </h5>
+                    <div className="text-sm text-gray-800 leading-relaxed whitespace-pre-line bg-emerald-50/40 p-4 rounded-2xl border border-emerald-100">
+                      {renderFormattedText(activeGroupModal.group.criteria)}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {!activeGroupModal.group.details &&
+                !activeGroupModal.group.rules &&
+                !activeGroupModal.group.criteria &&
+                (!activeGroupModal.group.pictures || activeGroupModal.group.pictures.length === 0) && (
+                  <div className="p-8 text-center bg-gray-50 rounded-2xl border border-gray-100 text-gray-500 text-sm">
+                    এই ক্যাটাগরি / গ্রুপের জন্য কোনো বিশেষ আলাদা নিয়ম নেই। মূল প্রতিযোগিতার সাধারণ নিয়মাবলী প্রযোজ্য।
+                  </div>
+                )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-3 shrink-0">
+              <div className="text-xs text-gray-500 font-medium">
+                ক্যাটাগরি {activeGroupModal.index + 1} / {groups.length}
+              </div>
+              <div className="flex items-center gap-2">
+                {groups.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={handleNextGroup}
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-white hover:bg-gray-100 text-[#1A284A] border border-gray-200 transition-colors cursor-pointer"
+                  >
+                    পরবর্তী ক্যাটাগরি →
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setActiveGroupModal(null)}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-[#1A284A] hover:bg-[#29479B] text-white transition-colors cursor-pointer shadow-xs"
+                >
+                  বন্ধ করুন
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Lightbox Modal */}
       {lightboxImage && (

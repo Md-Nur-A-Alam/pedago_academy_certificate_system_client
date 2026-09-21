@@ -113,3 +113,83 @@ body {
 .animate-pulse-glow {
   animation: pulse-glow 3.5s ease-in-out infinite, float 5s ease-in-out infinite;
 }
+
+@keyframes kenburns {
+  0% {
+    transform: scale(1) translate(0, 0);
+  }
+  50% {
+    transform: scale(1.08) translate(-1%, -1%);
+  }
+  100% {
+    transform: scale(1) translate(0, 0);
+  }
+}
+
+.animate-kenburns {
+  animation: kenburns 14s ease-in-out infinite alternate;
+}
+
+@keyframes tilt-3d {
+  0% {
+    transform: perspective(1000px) rotateY(-4deg) rotateX(2deg) scale(1);
+  }
+  50% {
+    transform: perspective(1000px) rotateY(4deg) rotateX(-2deg) scale(1.02);
+  }
+  100% {
+    transform: perspective(1000px) rotateY(-4deg) rotateX(2deg) scale(1);
+  }
+}
+
+.animate-tilt-3d {
+  animation: tilt-3d 6s ease-in-out infinite;
+  transform-style: preserve-3d;
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-150%) rotate(25deg);
+  }
+  100% {
+    transform: translateX(150%) rotate(25deg);
+  }
+}
+
+.animate-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.animate-shimmer::after {
+  content: '';
+  position: absolute;
+  top: -100%;
+  left: -100%;
+  width: 300%;
+  height: 300%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.03) 40%,
+    rgba(255, 255, 255, 0.35) 50%,
+    rgba(255, 255, 255, 0.03) 60%,
+    transparent 100%
+  );
+  animation: shimmer-sweep 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  pointer-events: none;
+  z-index: 10;
+}
+
+@keyframes bounce-subtle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-bounce-subtle {
+  animation: bounce-subtle 3s ease-in-out infinite;
+}

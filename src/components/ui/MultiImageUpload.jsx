@@ -10,6 +10,10 @@ import {
   Loader2,
   Sparkles,
   Images,
+  Eye,
+  Copy,
+  Check,
+  Image as ImageIcon,
 } from "lucide-react";
 import apiClient from "@/lib/api-client";
 import { toast } from "react-toastify";
@@ -27,6 +31,8 @@ export function MultiImageUpload({
   const [urlInput, setUrlInput] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [previewModalUrl, setPreviewModalUrl] = useState(null);
+  const [copied, setCopied] = useState(false);
 
   const canAddMore = images.length < maxImages;
 
@@ -258,7 +264,8 @@ export function MultiImageUpload({
           {images.map((imgUrl, idx) => (
             <div
               key={idx}
-              className="group relative rounded-xl border border-gray-200 overflow-hidden bg-gray-100 aspect-video sm:aspect-square flex items-center justify-center shadow-2xs"
+              onClick={() => setPreviewModalUrl(imgUrl)}
+              className="group relative rounded-xl border border-gray-200 overflow-hidden bg-gray-100 aspect-video sm:aspect-square flex items-center justify-center shadow-2xs cursor-pointer hover:border-purple-300 hover:shadow-md transition-all"
             >
               <img
                 src={imgUrl}
@@ -269,18 +276,23 @@ export function MultiImageUpload({
                 }}
               />
               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                <a
-                  href={imgUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="p-1.5 bg-white/90 hover:bg-white text-gray-800 rounded-lg shadow-sm transition-transform hover:scale-110"
-                  title="View full size"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
                 <button
                   type="button"
-                  onClick={() => handleRemoveImage(idx)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPreviewModalUrl(imgUrl);
+                  }}
+                  className="p-1.5 bg-white/90 hover:bg-white text-gray-800 rounded-lg shadow-sm transition-transform hover:scale-110 cursor-pointer"
+                  title="View details"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveImage(idx);
+                  }}
                   className="p-1.5 bg-red-600/90 hover:bg-red-600 text-white rounded-lg shadow-sm transition-transform hover:scale-110 cursor-pointer"
                   title="Remove picture"
                 >
@@ -297,6 +309,107 @@ export function MultiImageUpload({
         <div className="flex items-center gap-2 text-gray-400 text-xs py-1">
           <Images className="w-4 h-4" />
           <span>No pictures added yet (max {maxImages}).</span>
+        </div>
+      )}
+
+      {/* Image Preview & Details Modal */}
+      {previewModalUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setPreviewModalUrl(null)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full border border-gray-100 overflow-hidden my-6 max-h-[92vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-5 bg-gradient-to-r from-slate-50 via-purple-50/40 to-slate-50 border-b border-gray-100 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
+                  <ImageIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-[#1A284A]">
+                    ইমেজ প্রিভিউ ও বিবরণ (Image Preview)
+                  </h3>
+                  <p className="text-[11px] text-gray-500">
+                    {previewModalUrl.includes("postimg")
+                      ? "Hosted on Postimages"
+                      : previewModalUrl.includes("ibb.co")
+                      ? "Hosted on ImgBB"
+                      : "Cloud Storage"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewModalUrl(null)}
+                className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 overflow-y-auto space-y-4">
+              <div className="rounded-2xl overflow-hidden bg-slate-100 border border-gray-200 flex items-center justify-center max-h-[60vh]">
+                <img
+                  src={previewModalUrl}
+                  alt="Full preview"
+                  className="max-h-[60vh] w-auto max-w-full object-contain mx-auto"
+                />
+              </div>
+
+              {/* Direct Link & Copy */}
+              <div className="p-3 bg-gray-50 rounded-xl border border-gray-200/80 space-y-2">
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">
+                  Direct Image URL
+                </span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={previewModalUrl}
+                    className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-mono text-gray-700 select-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(previewModalUrl);
+                      setCopied(true);
+                      toast.success("Link copied to clipboard!");
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1A284A] hover:bg-[#29479B] text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0"
+                  >
+                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copied ? "Copied!" : "Copy"}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2 shrink-0">
+              <a
+                href={previewModalUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-white hover:bg-gray-100 text-[#1A284A] border border-gray-200 transition-colors"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>নতুন ট্যাবে খুলুন</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => setPreviewModalUrl(null)}
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-[#1A284A] hover:bg-[#29479B] text-white transition-colors cursor-pointer shadow-xs"
+              >
+                বন্ধ করুন
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

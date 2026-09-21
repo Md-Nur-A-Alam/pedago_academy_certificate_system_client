@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { ImageUpload } from "@/components/ui/ImageUpload";
+import { MultiImageUpload } from "@/components/ui/MultiImageUpload";
 import { useHomepageSettings } from "@/hooks/useHomepageSettings";
 
 export function HomePageSettingsView() {
@@ -37,6 +38,7 @@ export function HomePageSettingsView() {
   const [formData, setFormData] = useState(null);
   const [activeTab, setActiveTab] = useState("hero"); // 'hero' | 'competitions' | 'portals'
   const isInitializedRef = useRef(false);
+  const [previewIndex, setPreviewIndex] = useState(0);
 
   useEffect(() => {
     if (settings && !isInitializedRef.current) {
@@ -44,6 +46,32 @@ export function HomePageSettingsView() {
       isInitializedRef.current = true;
     }
   }, [settings]);
+
+  // Slideshow auto-advance effect (must be top-level hook to satisfy React Rules of Hooks)
+  const heroImages = formData?.hero?.images;
+  const heroImageUrl = formData?.hero?.imageUrl;
+  const previewStayTime = formData?.hero?.stayTime || 5;
+
+  const previewRawImages =
+    Array.isArray(heroImages) && heroImages.length > 0
+      ? heroImages
+      : heroImageUrl
+      ? [heroImageUrl]
+      : ["/HeroBG.jpg"];
+  const previewImages = previewRawImages.filter(
+    (img) => typeof img === "string" && img.trim().length > 0
+  );
+  if (previewImages.length === 0) previewImages.push("/HeroBG.jpg");
+
+  const safePreviewIndex = previewIndex % previewImages.length;
+
+  useEffect(() => {
+    if (previewImages.length <= 1) return;
+    const interval = setInterval(() => {
+      setPreviewIndex((prev) => (prev + 1) % previewImages.length);
+    }, Math.max(1, previewStayTime) * 1000);
+    return () => clearInterval(interval);
+  }, [previewImages.length, previewStayTime]);
 
   if (isLoading || !formData) {
     return (
@@ -270,6 +298,14 @@ export function HomePageSettingsView() {
       ? "animate-pulse-glow"
       : anim === "morph-amoeba"
       ? "animate-morph-amoeba"
+      : anim === "kenburns"
+      ? "animate-kenburns"
+      : anim === "tilt-3d"
+      ? "animate-tilt-3d"
+      : anim === "shimmer"
+      ? "animate-shimmer"
+      : anim === "bounce-subtle"
+      ? "animate-bounce-subtle"
       : "";
 
   const shadowStyle =
@@ -280,6 +316,31 @@ export function HomePageSettingsView() {
       : shadowType === "soft"
       ? "0 10px 25px -5px rgba(0, 0, 0, 0.3)"
       : "none";
+
+  const previewTransition = hero.transitionEffect || "fade";
+
+  const getPreviewTransitionClass = (isActive, idx) => {
+    if (previewTransition === "zoom") {
+      return isActive
+        ? "opacity-100 scale-100 z-10 transition-all duration-700 ease-out"
+        : "opacity-0 scale-110 z-0 transition-all duration-700 ease-out pointer-events-none";
+    }
+    if (previewTransition === "slide") {
+      return isActive
+        ? "opacity-100 translate-x-0 z-10 transition-all duration-500 ease-in-out"
+        : idx < safePreviewIndex
+        ? "opacity-0 -translate-x-full z-0 transition-all duration-500 ease-in-out pointer-events-none"
+        : "opacity-0 translate-x-full z-0 transition-all duration-500 ease-in-out pointer-events-none";
+    }
+    if (previewTransition === "kenburns") {
+      return isActive
+        ? "opacity-100 animate-kenburns z-10 transition-opacity duration-700 ease-in-out"
+        : "opacity-0 z-0 transition-opacity duration-700 ease-in-out pointer-events-none";
+    }
+    return isActive
+      ? "opacity-100 z-10 transition-opacity duration-700 ease-in-out"
+      : "opacity-0 z-0 transition-opacity duration-700 ease-in-out pointer-events-none";
+  };
 
   return (
     <div className="space-y-8 max-w-6xl pb-20">
@@ -367,20 +428,50 @@ export function HomePageSettingsView() {
             <div className="rounded-2xl overflow-hidden border border-gray-300 shadow-sm relative transition-all">
               {/* Background Mode */}
               {hero.layoutMode === "background" ? (
-                <div
-                  className="relative text-white py-16 px-6 sm:px-10 bg-cover bg-center bg-no-repeat transition-all min-h-[340px] flex items-center justify-center text-center"
-                  style={{
-                    backgroundImage: `url(${hero.imageUrl || "/HeroBG.jpg"})`,
-                  }}
-                >
+                <div className="relative text-white py-16 px-6 sm:px-10 overflow-hidden transition-all min-h-[340px] flex items-center justify-center text-center">
+                  {/* Slideshow Stack */}
+                  <div className="absolute inset-0 z-0 overflow-hidden">
+                    {previewImages.map((imgSrc, idx) => {
+                      const isActive = idx === safePreviewIndex;
+                      return (
+                        <div
+                          key={idx}
+                          className={`absolute inset-0 bg-cover bg-center bg-no-repeat ${getPreviewTransitionClass(
+                            isActive,
+                            idx
+                          )}`}
+                          style={{ backgroundImage: `url(${imgSrc})` }}
+                        />
+                      );
+                    })}
+                  </div>
+
                   {/* Overlay */}
                   <div
-                    className="absolute inset-0 transition-all"
+                    className="absolute inset-0 transition-all z-1"
                     style={{
                       background: getLiveHeroBackgroundStyle(),
                       opacity: (hero.bgOverlayOpacity ?? 80) / 100,
                     }}
                   />
+
+                  {/* Slide Indicators */}
+                  {hero.showIndicators !== false && previewImages.length > 1 && (
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 backdrop-blur-xs border border-white/20">
+                      {previewImages.map((_, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setPreviewIndex(idx)}
+                          className={`transition-all duration-300 rounded-full cursor-pointer ${
+                            idx === safePreviewIndex
+                              ? "w-4 h-1.5 bg-[#F59E0B]"
+                              : "w-1.5 h-1.5 bg-white/60 hover:bg-white"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  )}
 
                   <div className="relative z-10 max-w-3xl mx-auto space-y-4">
                     {hero.showBadge && (
@@ -428,7 +519,7 @@ export function HomePageSettingsView() {
               ) : (
                 /* Flex Mode with Styled Picture Card */
                 <div
-                  className="relative text-white py-12 px-6 sm:px-10 transition-all min-h-[340px] flex items-center"
+                  className="relative text-white py-12 px-6 sm:px-10 transition-all min-h-[340px] flex items-center overflow-hidden"
                   style={{
                     background: getLiveHeroBackgroundStyle(),
                   }}
@@ -477,7 +568,7 @@ export function HomePageSettingsView() {
                       )}
                     </div>
 
-                    {/* Right Picture with Live Calculated Styling */}
+                    {/* Right Picture with Live Calculated Styling & Slideshow */}
                     <div className="flex justify-center">
                       <div
                         className={`relative overflow-hidden w-full bg-black/40 group transition-all duration-300 ${sizeClass} ${shapeClass} ${animClass}`}
@@ -487,20 +578,48 @@ export function HomePageSettingsView() {
                           ...shapeInlineStyle,
                         }}
                       >
-                        <img
-                          src={hero.imageUrl || "/HeroBG.jpg"}
-                          alt="Hero Graphic"
-                          className="w-full h-full object-cover"
-                        />
+                        <div className="relative w-full h-full min-h-[220px]">
+                          {previewImages.map((imgSrc, idx) => {
+                            const isActive = idx === safePreviewIndex;
+                            return (
+                              <img
+                                key={idx}
+                                src={imgSrc}
+                                alt="Hero Graphic"
+                                className={`absolute inset-0 w-full h-full object-cover ${getPreviewTransitionClass(
+                                  isActive,
+                                  idx
+                                )}`}
+                              />
+                            );
+                          })}
+                        </div>
 
                         {fadeStyle === "bottom" && (
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none z-15" />
                         )}
                         {fadeStyle === "vignette" && (
-                          <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.85)_100%)] pointer-events-none" />
+                          <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.85)_100%)] pointer-events-none z-15" />
                         )}
                         {fadeStyle === "radial" && (
-                          <div className="absolute inset-0 bg-gradient-to-tr from-black/70 via-transparent to-black/30 pointer-events-none" />
+                          <div className="absolute inset-0 bg-gradient-to-tr from-black/70 via-transparent to-black/30 pointer-events-none z-15" />
+                        )}
+
+                        {hero.showIndicators !== false && previewImages.length > 1 && (
+                          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/50 backdrop-blur-xs border border-white/20">
+                            {previewImages.map((_, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => setPreviewIndex(idx)}
+                                className={`transition-all duration-300 rounded-full cursor-pointer ${
+                                  idx === safePreviewIndex
+                                    ? "w-3 h-1 bg-[#F59E0B]"
+                                    : "w-1 h-1 bg-white/60 hover:bg-white"
+                                }`}
+                              />
+                            ))}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -573,17 +692,113 @@ export function HomePageSettingsView() {
                 </div>
               </div>
 
-              {/* Image Upload / URL */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-700 block">
-                  Hero Image / Picture
-                </label>
-                <ImageUpload
-                  value={hero.imageUrl || ""}
-                  onChange={(url) => handleHeroChange("imageUrl", url)}
-                  placeholder="Upload picture or paste URL"
-                  helpText="Acts as background in Background mode, or styled graphic in Flex mode."
+              {/* Multi-Image Slideshow Upload / URL (up to 10 images) */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 block">
+                      Hero Banner Images (Multiple Slideshow)
+                    </label>
+                    <span className="text-[11px] text-gray-500">
+                      Upload up to 10 images for the hero background or flex picture card.
+                    </span>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-[#29479B] bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100">
+                    {(Array.isArray(hero.images) && hero.images.length > 0 ? hero.images.length : (hero.imageUrl ? 1 : 0))}/10
+                  </span>
+                </div>
+
+                <MultiImageUpload
+                  images={
+                    Array.isArray(hero.images) && hero.images.length > 0
+                      ? hero.images
+                      : hero.imageUrl
+                      ? [hero.imageUrl]
+                      : []
+                  }
+                  onChange={(newImages) => {
+                    handleHeroChange("images", newImages);
+                    if (newImages.length > 0) {
+                      handleHeroChange("imageUrl", newImages[0]);
+                    }
+                  }}
+                  maxImages={10}
+                  title="Hero Slideshow Gallery"
+                  helperText="Add up to 10 images. They will smoothly rotate one by one after your chosen stay time."
                 />
+
+                {/* Slideshow Stay Time & Transition Controls */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-gray-50/80 border border-gray-200">
+                  {/* Stay Time */}
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                        <Sliders className="w-3.5 h-3.5 text-[#29479B]" />
+                        Slide Stay Time (n seconds)
+                      </label>
+                      <span className="text-xs font-mono font-bold text-[#29479B] bg-white px-2 py-0.5 rounded border border-blue-100">
+                        {hero.stayTime || 5}s
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="30"
+                      value={hero.stayTime || 5}
+                      onChange={(e) =>
+                        handleHeroChange("stayTime", parseInt(e.target.value, 10))
+                      }
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#29479B] mt-2"
+                    />
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      Each picture stays on screen for {hero.stayTime || 5} seconds before auto-advancing.
+                    </p>
+                  </div>
+
+                  {/* Transition Effect */}
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 block mb-1">
+                      Transition Motion Effect
+                    </label>
+                    <select
+                      value={hero.transitionEffect || "fade"}
+                      onChange={(e) =>
+                        handleHeroChange("transitionEffect", e.target.value)
+                      }
+                      className="w-full text-xs font-semibold py-2 px-3 rounded-lg border border-gray-300 bg-white shadow-2xs"
+                    >
+                      <option value="fade">✨ Smooth Crossfade</option>
+                      <option value="slide">➡️ Horizontal Slide</option>
+                      <option value="zoom">🔍 Slow Zoom Depth Transition</option>
+                      <option value="kenburns">🎬 Ken-Burns Cinematic Pan & Zoom</option>
+                    </select>
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      Visual animation used to transition to the next image.
+                    </p>
+                  </div>
+
+                  {/* Slide Indicators & Navigation Toggles */}
+                  <div className="sm:col-span-2 pt-2 border-t border-gray-200/60 flex flex-wrap items-center gap-6">
+                    <label className="flex items-center gap-2 text-xs font-bold text-gray-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={hero.showIndicators ?? true}
+                        onChange={(e) => handleHeroChange("showIndicators", e.target.checked)}
+                        className="rounded text-[#29479B] focus:ring-[#29479B] w-4 h-4"
+                      />
+                      <span>Show Slide Dot Indicators</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-xs font-bold text-gray-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={hero.showNavigation ?? true}
+                        onChange={(e) => handleHeroChange("showNavigation", e.target.checked)}
+                        className="rounded text-[#29479B] focus:ring-[#29479B] w-4 h-4"
+                      />
+                      <span>Show Arrow Navigation Buttons</span>
+                    </label>
+                  </div>
+                </div>
               </div>
 
               {/* Background Fill Style: Solid or Gradient */}
@@ -1148,6 +1363,10 @@ export function HomePageSettingsView() {
                     <option value="float">Gentle Floating (Smooth Bobbing)</option>
                     <option value="pulse-glow">Pulse Breathing Glow</option>
                     <option value="morph-amoeba">Amoeba Fluid Morphing</option>
+                    <option value="kenburns">🎬 Ken-Burns Cinematic Pan & Zoom</option>
+                    <option value="tilt-3d">🧊 Dynamic 3D Perspective Tilt</option>
+                    <option value="shimmer">✨ Prismatic Light Shimmer Sweep</option>
+                    <option value="bounce-subtle">🪀 Subtle Elastic Float Bounce</option>
                   </select>
                 </div>
               </div>
