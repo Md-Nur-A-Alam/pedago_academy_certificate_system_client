@@ -19,7 +19,9 @@ import {
   Filter,
   RotateCcw,
   CheckCircle2,
+  UserPlus,
 } from "lucide-react";
+import { PublicRegistrationModal, RegistrationSuccessModal } from "@/features/participants";
 
 const TOPIC_ICONS = {
   "ছবি আঁকা": "🎨",
@@ -36,6 +38,8 @@ export default function CompetitionsPage() {
   const [selectedTopic, setSelectedTopic] = useState("all");
   const [selectedAge, setSelectedAge] = useState("all");
   const [dateStatus, setDateStatus] = useState("all"); // 'all' | 'active' | 'archived'
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [registeredData, setRegisteredData] = useState(null);
 
   // Fetch dynamic topics list from database
   const { data: availableTopics = [] } = useQuery({
@@ -100,6 +104,30 @@ export default function CompetitionsPage() {
           <p className="text-gray-600 text-sm sm:text-base leading-relaxed">
             চিঠি, ভিডিও, ছবি আঁকা, কবিতা আবৃত্তিসহ পেডাগো একাডেমির সকল প্রতিযোগিতার বিস্তারিত নিয়মাবলী, ক্যাটাগরি, বয়স ও সময়সীমা দেখে অংশ নিন এবং সার্টিফিকেট ডাউনলোড করুন।
           </p>
+        </div>
+
+        {/* Top Registration Callout Banner */}
+        <div className="bg-linear-to-r from-[#1A284A] via-[#29479B] to-[#1A284A] rounded-3xl p-6 sm:p-8 text-white shadow-md relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 border border-white/10">
+          <div className="space-y-2 max-w-2xl text-center md:text-left">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-[#F59E0B] text-xs font-bold uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>অংশগ্রহণকারী সেলফ-রেজিস্ট্রেশন (No Login Needed)</span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight">
+              প্রতিযোগিতায় অংশ নিয়েছেন? আপনার তথ্য যুক্ত করুন
+            </h2>
+            <p className="text-xs sm:text-sm text-white/80 leading-relaxed">
+              প্রতিযোগিতা ও ক্যাটাগরি বেছে নিয়ে নাম, ফোন, সাবমিশন লিংক দিন এবং তাৎক্ষণিকভাবে আপনার অফিশিয়াল রেফারেন্স আইডি সংগ্রহ করুন।
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsRegisterOpen(true)}
+            className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-sm shadow-lg hover:shadow-xl transition-all shrink-0 cursor-pointer hover:scale-105"
+          >
+            <UserPlus className="w-5 h-5" />
+            <span>নিবন্ধন করুন (Register Now)</span>
+          </button>
         </div>
 
         {/* Multi-Filter Bar */}
@@ -435,6 +463,19 @@ export default function CompetitionsPage() {
           </div>
         )}
       </div>
+
+      {/* Registration Modals */}
+      <PublicRegistrationModal
+        isOpen={isRegisterOpen}
+        onClose={() => setIsRegisterOpen(false)}
+        onRegistered={(data) => setRegisteredData(data)}
+      />
+
+      <RegistrationSuccessModal
+        isOpen={Boolean(registeredData)}
+        onClose={() => setRegisteredData(null)}
+        data={registeredData}
+      />
     </div>
   );
 }

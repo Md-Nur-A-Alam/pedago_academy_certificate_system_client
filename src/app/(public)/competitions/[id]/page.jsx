@@ -29,8 +29,10 @@ import {
   Clock,
   XCircle,
   Users,
+  UserPlus,
 } from "lucide-react";
 import { toast } from "react-toastify";
+import { PublicRegistrationModal, RegistrationSuccessModal } from "@/features/participants";
 
 export default function CompetitionDetailsPage() {
   const { id } = useParams();
@@ -38,6 +40,8 @@ export default function CompetitionDetailsPage() {
   const queryClient = useQueryClient();
   const { admin } = useCurrentAdmin();
 
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [registeredData, setRegisteredData] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedGroupTab, setSelectedGroupTab] = useState(0);
   const [activeGroupModal, setActiveGroupModal] = useState(null); // { group, index }
@@ -473,6 +477,16 @@ export default function CompetitionDetailsPage() {
             {/* Quick Action CTAs */}
             <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
               <div className="flex flex-wrap items-center gap-3">
+                {/* 1. Register as Participant CTA */}
+                <button
+                  type="button"
+                  onClick={() => setIsRegisterOpen(true)}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-extrabold text-sm hover:bg-emerald-700 shadow-md hover:shadow-lg transition-all cursor-pointer hover:scale-102"
+                >
+                  <UserPlus className="w-4 h-4 text-white" />
+                  <span>অংশগ্রহণকারী হিসেবে নিবন্ধন করুন</span>
+                </button>
+
                 {competition.providesCertificate !== false ? (
                   <Link
                     href={`/certificates?competitionId=${competition._id}`}
@@ -1199,6 +1213,21 @@ export default function CompetitionDetailsPage() {
           />
         </Modal>
       )}
+
+      {/* Public Registration Modals */}
+      <PublicRegistrationModal
+        isOpen={isRegisterOpen}
+        onClose={() => setIsRegisterOpen(false)}
+        defaultCompetitionId={competition?._id || id}
+        lockCompetition={true}
+        onRegistered={(data) => setRegisteredData(data)}
+      />
+
+      <RegistrationSuccessModal
+        isOpen={Boolean(registeredData)}
+        onClose={() => setRegisteredData(null)}
+        data={registeredData}
+      />
     </div>
   );
 }

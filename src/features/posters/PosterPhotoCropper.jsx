@@ -19,6 +19,8 @@ import {
  * Interactive Photo Cropper with Rule-of-Thirds Grid, Pan/Zoom,
  * and Shape Selection (Circle, Rounded Square, Rectangle)
  */
+const emptySubscribe = () => () => {};
+
 export function PosterPhotoCropper({
   imageSrc,
   frameShape = "circle", // 'circle' | 'rounded' | 'rectangle'
@@ -32,11 +34,11 @@ export function PosterPhotoCropper({
   onCropComplete,
   className = "",
 }) {
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  const isMounted = React.useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
 
   if (!isMounted || !imageSrc) return null;
 
