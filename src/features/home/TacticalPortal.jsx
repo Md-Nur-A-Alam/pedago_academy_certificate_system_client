@@ -1,16 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { Award, FileText, Image as ImageIcon, ArrowRight, Trophy, UserPlus, Sparkles } from "lucide-react";
+import { Award, FileText, Image as ImageIcon, ArrowRight, ArrowDown, Trophy, UserPlus, Sparkles } from "lucide-react";
 import { useHomepageSettings } from "@/hooks/useHomepageSettings";
-import { PublicRegistrationModal, RegistrationSuccessModal } from "@/features/participants";
 
 export function TacticalPortal() {
   const { settings } = useHomepageSettings();
   const quickPortals = settings?.quickPortals || {};
-  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
-  const [registeredData, setRegisteredData] = useState(null);
 
   if (quickPortals.showSection === false) {
     return null;
@@ -50,14 +46,13 @@ export function TacticalPortal() {
                 প্রতিযোগিতায় অংশগ্রহণ করেছেন? কোনো লগইন ছাড়াই আপনার সাবমিশন ডেটা যুক্ত করুন এবং সাথে সাথে অনন্য রেফারেন্স কোড পান।
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsRegisterOpen(true)}
+            <a
+              href="#participant-registration"
               className="inline-flex items-center justify-between w-full px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
             >
-              <span>নিবন্ধন করুন (Register)</span>
+              <span>নিবন্ধন ফর্মে যান (Register)</span>
               <Sparkles className="w-3.5 h-3.5 text-[#F59E0B]" />
-            </button>
+            </a>
           </div>
 
           {/* Portal Card 2: Certificate Download */}
@@ -127,19 +122,6 @@ export function TacticalPortal() {
           </div>
         </div>
       </div>
-
-      {/* Registration Modals */}
-      <PublicRegistrationModal
-        isOpen={isRegisterOpen}
-        onClose={() => setIsRegisterOpen(false)}
-        onRegistered={(data) => setRegisteredData(data)}
-      />
-
-      <RegistrationSuccessModal
-        isOpen={Boolean(registeredData)}
-        onClose={() => setRegisteredData(null)}
-        data={registeredData}
-      />
     </section>
   );
 }

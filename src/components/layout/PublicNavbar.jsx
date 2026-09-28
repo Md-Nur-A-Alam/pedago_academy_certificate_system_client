@@ -2,15 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { UserPlus } from "lucide-react";
 import { useSystemSettings } from "@/hooks/useSystemSettings";
-import { PublicRegistrationModal, RegistrationSuccessModal } from "@/features/participants";
 
 export function PublicNavbar() {
   const { settings } = useSystemSettings();
   const [logoError, setLogoError] = useState(false);
-  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
-  const [registeredData, setRegisteredData] = useState(null);
 
   const logoSrc = !logoError && settings?.logoUrl ? settings.logoUrl : null;
   const siteTitle = settings?.siteTitle || "PEDAGO ACADEMY";
@@ -60,29 +56,14 @@ export function PublicNavbar() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setIsRegisterOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs sm:text-sm font-bold shadow-sm hover:shadow-md transition-all cursor-pointer hover:scale-105"
+          <Link
+            href="/certificates"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#29479B] hover:bg-[#3459c0] text-white text-xs sm:text-sm font-semibold shadow-xs hover:shadow-md transition-all"
           >
-            <UserPlus className="w-4 h-4" />
-            <span>নিবন্ধন করুন (Register)</span>
-          </button>
+            <span>সার্টিফিকেট যাচাই</span>
+          </Link>
         </div>
       </div>
-
-      {/* Quick Navbar Registration Modals */}
-      <PublicRegistrationModal
-        isOpen={isRegisterOpen}
-        onClose={() => setIsRegisterOpen(false)}
-        onRegistered={(data) => setRegisteredData(data)}
-      />
-
-      <RegistrationSuccessModal
-        isOpen={Boolean(registeredData)}
-        onClose={() => setRegisteredData(null)}
-        data={registeredData}
-      />
     </header>
   );
 }

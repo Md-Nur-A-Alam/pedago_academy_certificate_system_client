@@ -32,7 +32,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { toast } from "react-toastify";
-import { PublicRegistrationModal, RegistrationSuccessModal } from "@/features/participants";
+import { ParticipantRegistrationForm } from "@/features/participants";
 
 export default function CompetitionDetailsPage() {
   const { id } = useParams();
@@ -40,8 +40,6 @@ export default function CompetitionDetailsPage() {
   const queryClient = useQueryClient();
   const { admin } = useCurrentAdmin();
 
-  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
-  const [registeredData, setRegisteredData] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedGroupTab, setSelectedGroupTab] = useState(0);
   const [activeGroupModal, setActiveGroupModal] = useState(null); // { group, index }
@@ -467,61 +465,120 @@ export default function CompetitionDetailsPage() {
               </div>
             )}
 
-            {/* Description */}
-            {competition.description && (
-              <div className="text-gray-700 text-sm sm:text-base leading-relaxed bg-slate-50/80 p-5 rounded-2xl border border-gray-100">
-                <p className="whitespace-pre-line">{competition.description}</p>
-              </div>
-            )}
-
-            {/* Quick Action CTAs */}
-            <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-              <div className="flex flex-wrap items-center gap-3">
-                {/* 1. Register as Participant CTA */}
-                <button
-                  type="button"
-                  onClick={() => setIsRegisterOpen(true)}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-extrabold text-sm hover:bg-emerald-700 shadow-md hover:shadow-lg transition-all cursor-pointer hover:scale-102"
-                >
-                  <UserPlus className="w-4 h-4 text-white" />
-                  <span>অংশগ্রহণকারী হিসেবে নিবন্ধন করুন</span>
-                </button>
-
-                {competition.providesCertificate !== false ? (
-                  <Link
-                    href={`/certificates?competitionId=${competition._id}`}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#29479B] text-white font-bold text-sm hover:bg-[#1A284A] shadow-md hover:shadow-lg transition-all"
-                  >
-                    <Award className="w-4 h-4" />
-                    <span>সার্টিফিকেট সংগ্রহ ও যাচাই</span>
-                  </Link>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gray-100 text-gray-500 font-semibold text-xs border border-gray-200">
-                    <XCircle className="w-3.5 h-3.5" />
-                    <span>এই প্রতিযোগিতায় সার্টিফিকেট প্রযোজ্য নয়</span>
-                  </span>
+            {/* Flex Competition Details Texts with Participant Registration Form */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start pt-2">
+              {/* Left Column: Competition Details Texts (Overview, Dates, Action Links) */}
+              <div className="lg:col-span-7 space-y-6">
+                {competition.description && (
+                  <div className="text-gray-700 text-sm sm:text-base leading-relaxed bg-slate-50/80 p-5 sm:p-6 rounded-2xl border border-gray-100 space-y-2">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                      প্রতিযোগিতার বিবরণ (Overview & Details)
+                    </h3>
+                    <p className="whitespace-pre-line leading-relaxed">{competition.description}</p>
+                  </div>
                 )}
 
-                <Link
-                  href={`/posters?competitionId=${competition._id}`}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#F59E0B] text-white font-bold text-sm hover:bg-[#d97706] shadow-md hover:shadow-lg transition-all"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  <span>মাইলস্টোন পোস্টার তৈরি</span>
-                </Link>
+                {/* Key Highlights Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {(competition.startDate || competition.endDate) && (
+                    <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-100 space-y-1">
+                      <div className="flex items-center gap-2 text-xs font-bold text-[#29479B]">
+                        <Calendar className="w-4 h-4" />
+                        <span>সময়সীমা (Timeline)</span>
+                      </div>
+                      <p className="text-xs text-gray-700 font-semibold">
+                        {competition.startDate || "শুরু"} হতে {competition.endDate || "শেষ"}
+                      </p>
+                    </div>
+                  )}
+
+                  {competition.resultPublishDate && (
+                    <div className="p-4 rounded-2xl bg-purple-50/70 border border-purple-100 space-y-1">
+                      <div className="flex items-center gap-2 text-xs font-bold text-purple-900">
+                        <Clock className="w-4 h-4 text-purple-600" />
+                        <span>ফলাফল প্রকাশ (Result Date)</span>
+                      </div>
+                      <p className="text-xs text-gray-700 font-semibold">
+                        {competition.resultPublishDate}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-100 space-y-1">
+                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-800">
+                      <Award className="w-4 h-4 text-emerald-600" />
+                      <span>সার্টিফিকেট প্রাপ্যতা</span>
+                    </div>
+                    <p className="text-xs text-gray-700 font-semibold">
+                      {competition.providesCertificate !== false
+                        ? "অফিশিয়াল সার্টিফিকেট প্রদান করা হবে"
+                        : "সার্টিফিকেট প্রযোজ্য নয়"}
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-100 space-y-1">
+                    <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
+                      <Layers className="w-4 h-4 text-[#F59E0B]" />
+                      <span>ক্যাটাগরি বা গ্রুপ</span>
+                    </div>
+                    <p className="text-xs text-gray-700 font-semibold">
+                      {competition.category || "General"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Quick Action CTAs */}
+                <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-gray-100">
+                  <div className="flex flex-wrap items-center gap-3">
+                    {competition.providesCertificate !== false ? (
+                      <Link
+                        href={`/certificates?competitionId=${competition._id}`}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#29479B] text-white font-bold text-xs sm:text-sm hover:bg-[#1A284A] shadow-xs hover:shadow-md transition-all"
+                      >
+                        <Award className="w-4 h-4" />
+                        <span>সার্টিফিকেট সংগ্রহ ও যাচাই</span>
+                      </Link>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gray-100 text-gray-500 font-semibold text-xs border border-gray-200">
+                        <XCircle className="w-3.5 h-3.5" />
+                        <span>সার্টিফিকেট প্রযোজ্য নয়</span>
+                      </span>
+                    )}
+
+                    <Link
+                      href={`/posters?competitionId=${competition._id}`}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#F59E0B] text-white font-bold text-xs sm:text-sm hover:bg-[#d97706] shadow-xs hover:shadow-md transition-all"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      <span>মাইলস্টোন পোস্টার তৈরি</span>
+                    </Link>
+                  </div>
+
+                  {competition.sourceLink && (
+                    <a
+                      href={competition.sourceLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 hover:text-[#29479B] transition-colors"
+                    >
+                      <span>অফিসিয়াল ইভেন্ট লিঙ্ক</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                </div>
               </div>
 
-              {competition.sourceLink && (
-                <a
-                  href={competition.sourceLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 hover:text-[#29479B] transition-colors"
-                >
-                  <span>অফিসিয়াল ইভেন্ট লিঙ্ক</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              )}
+              {/* Right Column: Participant Registration Form */}
+              <div className="lg:col-span-5">
+                <ParticipantRegistrationForm
+                  defaultCompetitionId={competition._id}
+                  lockCompetition={true}
+                  competitionData={competition}
+                  title="অংশগ্রহণকারী নিবন্ধন"
+                  subtitle={`"${competition.name}" এ সরাসরি যুক্ত হন`}
+                  className="shadow-sm border border-emerald-500/30"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -1213,21 +1270,6 @@ export default function CompetitionDetailsPage() {
           />
         </Modal>
       )}
-
-      {/* Public Registration Modals */}
-      <PublicRegistrationModal
-        isOpen={isRegisterOpen}
-        onClose={() => setIsRegisterOpen(false)}
-        defaultCompetitionId={competition?._id || id}
-        lockCompetition={true}
-        onRegistered={(data) => setRegisteredData(data)}
-      />
-
-      <RegistrationSuccessModal
-        isOpen={Boolean(registeredData)}
-        onClose={() => setRegisteredData(null)}
-        data={registeredData}
-      />
     </div>
   );
 }
