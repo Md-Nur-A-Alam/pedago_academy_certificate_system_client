@@ -3,7 +3,7 @@
 import React from "react";
 
 export const Input = React.forwardRef(function Input(
-  { label, error, className = "", id, ...props },
+  { label, error, helperText, className = "", id, ...props },
   ref
 ) {
   const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
@@ -24,6 +24,7 @@ export const Input = React.forwardRef(function Input(
         {...props}
       />
       {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      {!error && helperText && <p className="text-xs text-gray-500 mt-1">{helperText}</p>}
     </div>
   );
 });

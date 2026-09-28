@@ -54,15 +54,6 @@ export function PublicNavbar() {
             Contact
           </Link>
         </nav>
-
-        <div className="flex items-center gap-3">
-          <Link
-            href="/certificates"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#29479B] hover:bg-[#3459c0] text-white text-xs sm:text-sm font-semibold shadow-xs hover:shadow-md transition-all"
-          >
-            <span>সার্টিফিকেট যাচাই</span>
-          </Link>
-        </div>
       </div>
     </header>
   );

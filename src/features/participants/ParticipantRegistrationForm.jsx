@@ -447,16 +447,19 @@ export function ParticipantRegistrationForm({
               value={activeCompetitionId}
               onChange={(e) => {
                 setSelectedCompetitionId(e.target.value);
+                setCategory("");
                 clearErrors();
               }}
               disabled={isLoadingCompetitions || lockCompetition}
-              className="w-full text-xs font-medium"
+              className="w-full text-xs sm:text-sm font-medium text-gray-900 bg-white"
             >
-              {competitions.length === 0 ? (
+              {isLoadingCompetitions ? (
+                <option value="">প্রতিযোগিতা লোড হচ্ছে... (Loading...)</option>
+              ) : competitions.length === 0 ? (
                 <option value="">কোনো সক্রিয় প্রতিযোগিতা নেই</option>
               ) : (
                 competitions.map((c) => (
-                  <option key={c._id} value={c._id}>
+                  <option key={c._id} value={c._id} className="text-gray-900 bg-white">
                     {c.name} {c.refPrefix ? `(${c.refPrefix})` : ""}
                   </option>
                 ))
@@ -476,13 +479,18 @@ export function ParticipantRegistrationForm({
               setCategory(e.target.value);
               clearErrors();
             }}
-            className="w-full text-xs font-medium"
+            disabled={availableCategories.length === 0}
+            className="w-full text-xs sm:text-sm font-medium text-gray-900 bg-white"
           >
-            {availableCategories.map((catName) => (
-              <option key={catName} value={catName}>
-                {catName}
-              </option>
-            ))}
+            {availableCategories.length === 0 ? (
+              <option value="General">General</option>
+            ) : (
+              availableCategories.map((catName) => (
+                <option key={catName} value={catName} className="text-gray-900 bg-white">
+                  {catName}
+                </option>
+              ))
+            )}
           </Select>
         </div>
 
