@@ -24,6 +24,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import apiClient from "@/lib/api-client";
 import { toast } from "react-toastify";
+import { getRegistrationStatus } from "@/lib/dateUtils";
 
 export function PublicRegistrationModal({
   isOpen,
@@ -69,6 +70,11 @@ export function PublicRegistrationModal({
   const currentCompetition = useMemo(() => {
     return competitions.find((c) => c._id === activeCompetitionId) || null;
   }, [competitions, activeCompetitionId]);
+
+  // Compute registration timeline eligibility (startDate and endDate checks)
+  const regStatus = useMemo(() => {
+    return getRegistrationStatus(currentCompetition);
+  }, [currentCompetition]);
 
   // Derive categories available for selected competition
   const availableCategories = useMemo(() => {
@@ -116,6 +122,11 @@ export function PublicRegistrationModal({
     setRateLimitInfo(null);
 
     // Frontend validation
+    if (!regStatus.isOpen) {
+      setErrorMessage(regStatus.message || "এই প্রতিযোগিতার জন্য বর্তমানে নিবন্ধন গ্রহণ করা হচ্ছে না।");
+      toast.error(regStatus.message || "নিবন্ধন গ্রহণ করা হচ্ছে না।");
+      return;
+    }
     if (!activeCompetitionId) {
       setErrorMessage("Please select a competition.");
       return;
@@ -248,6 +259,35 @@ export function PublicRegistrationModal({
             </div>
           )}
 
+          {/* Registration Window Status Notice */}
+          {!regStatus.isOpen && (
+            <div
+              className={`p-3.5 rounded-xl border flex items-start gap-2.5 animate-in fade-in ${
+                regStatus.status === "upcoming"
+                  ? "bg-amber-50 border-amber-300 text-amber-900"
+                  : "bg-rose-50 border-rose-300 text-rose-900"
+              }`}
+            >
+              {regStatus.status === "upcoming" ? (
+                <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              )}
+              <div className="text-xs space-y-0.5">
+                <p className="font-bold">
+                  {regStatus.status === "upcoming"
+                    ? "নিবন্ধন এখনও শুরু হয়নি"
+                    : "নিবন্ধনের সময়সীমা সমাপ্ত হয়েছে"}
+                </p>
+                <p className="opacity-90">
+                  {regStatus.status === "upcoming"
+                    ? `এই প্রতিযোগিতার নিবন্ধন শুরু হবে ${currentCompetition?.startDate} তারিখে।`
+                    : `এই প্রতিযোগিতার শেষ তারিখ ছিল ${currentCompetition?.endDate}। বর্তমানে নিবন্ধন বন্ধ রয়েছে।`}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* General Error Message */}
           {errorMessage && (
             <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
@@ -267,9 +307,22 @@ export function PublicRegistrationModal({
                   <Trophy className="w-4 h-4 text-[#29479B]" />
                   <span className="font-bold text-[#1A284A]">{currentCompetition.name}</span>
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-[#29479B]">
-                  Pre-selected
-                </span>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-[#29479B]">
+                    Pre-selected
+                  </span>
+                  {!regStatus.isOpen && (
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        regStatus.status === "upcoming"
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-rose-100 text-rose-800"
+                      }`}
+                    >
+                      {regStatus.status === "upcoming" ? "শুরু হয়নি" : "বন্ধ"}
+                    </span>
+                  )}
+                </div>
               </div>
             ) : (
               <Select
@@ -281,11 +334,19 @@ export function PublicRegistrationModal({
                 disabled={isLoadingCompetitions || lockCompetition}
                 className="w-full text-xs font-medium"
               >
-                {competitions.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.name} {c.refPrefix ? `(${c.refPrefix})` : ""}
-                  </option>
-                ))}
+                {competitions.map((c) => {
+                  const cStatus = getRegistrationStatus(c);
+                  const statusTag = !cStatus.isOpen
+                    ? cStatus.status === "upcoming"
+                      ? ` [শুরু হয়নি: ${c.startDate}]`
+                      : ` [নিবন্ধন শেষ: ${c.endDate}]`
+                    : "";
+                  return (
+                    <option key={c._id} value={c._id}>
+                      {c.name} {c.refPrefix ? `(${c.refPrefix})` : ""}{statusTag}
+                    </option>
+                  );
+                })}
               </Select>
             )}
           </div>
@@ -413,14 +474,28 @@ export function PublicRegistrationModal({
             <Button
               type="submit"
               variant="primary"
-              disabled={isSubmitting}
-              className="text-xs px-5 py-2.5"
+              disabled={isSubmitting || !regStatus.isOpen}
+              className={`text-xs px-5 py-2.5 ${
+                !regStatus.isOpen ? "bg-gray-300 hover:bg-gray-300 text-gray-600 cursor-not-allowed border border-gray-400/30" : ""
+              }`}
             >
               {isSubmitting ? (
                 <>
                   <Spinner size="sm" className="mr-2 text-white" />
                   <span>জমা হচ্ছে... (Submitting)</span>
                 </>
+              ) : !regStatus.isOpen ? (
+                regStatus.status === "upcoming" ? (
+                  <>
+                    <Clock className="w-3.5 h-3.5 mr-1.5 text-amber-700" />
+                    <span>শুরু হবে: {currentCompetition?.startDate}</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="w-3.5 h-3.5 mr-1.5 text-rose-700" />
+                    <span>নিবন্ধন বন্ধ</span>
+                  </>
+                )
               ) : (
                 <>
                   <Sparkles className="w-4 h-4 mr-1.5 text-[#F59E0B]" />

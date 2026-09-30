@@ -30,9 +30,11 @@ import {
   XCircle,
   Users,
   UserPlus,
+  Lock,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { ParticipantRegistrationForm } from "@/features/participants";
+import { getRegistrationStatus, getCertificateReleaseStatus } from "@/lib/dateUtils";
 
 export default function CompetitionDetailsPage() {
   const { id } = useParams();
@@ -63,6 +65,14 @@ export default function CompetitionDetailsPage() {
     },
     enabled: Boolean(id),
   });
+
+  const regStatus = useMemo(() => {
+    return getRegistrationStatus(competition);
+  }, [competition]);
+
+  const certStatus = useMemo(() => {
+    return getCertificateReleaseStatus(competition);
+  }, [competition]);
 
   // Prepare full linked gallery list with robust fallbacks (top-level hook)
   const linkedGallery = useMemo(() => {
@@ -371,6 +381,34 @@ export default function CompetitionDetailsPage() {
                   {/* Date range in banner if provided */}
                   {(competition.startDate || competition.endDate || competition.resultPublishDate) && (
                     <div className="flex items-center gap-3 flex-wrap text-xs text-white/90 pt-1">
+                      {/* Registration Status Pill */}
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg backdrop-blur-xs font-bold ${
+                          regStatus.status === "upcoming"
+                            ? "bg-amber-500/30 text-amber-200 border border-amber-400/40"
+                            : regStatus.status === "ended"
+                            ? "bg-rose-500/30 text-rose-200 border border-rose-400/40"
+                            : "bg-emerald-500/30 text-emerald-200 border border-emerald-400/40"
+                        }`}
+                      >
+                        {regStatus.status === "upcoming" ? (
+                          <>
+                            <Clock className="w-3.5 h-3.5 text-amber-300" />
+                            <span>নিবন্ধন শুরু: {competition.startDate}</span>
+                          </>
+                        ) : regStatus.status === "ended" ? (
+                          <>
+                            <XCircle className="w-3.5 h-3.5 text-rose-300" />
+                            <span>নিবন্ধন সমাপ্ত</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+                            <span>নিবন্ধন চলছে</span>
+                          </>
+                        )}
+                      </span>
+
                       {(competition.startDate || competition.endDate) && (
                         <span className="inline-flex items-center gap-1.5 bg-black/40 backdrop-blur-xs px-3 py-1 rounded-lg">
                           <Calendar className="w-3.5 h-3.5 text-[#F59E0B]" />
@@ -378,9 +416,20 @@ export default function CompetitionDetailsPage() {
                         </span>
                       )}
                       {competition.resultPublishDate && (
-                        <span className="inline-flex items-center gap-1.5 bg-black/40 backdrop-blur-xs px-3 py-1 rounded-lg">
-                          <Clock className="w-3.5 h-3.5 text-[#F59E0B]" />
-                          <span>ফলাফল প্রকাশ: {competition.resultPublishDate}</span>
+                        <span className={`inline-flex items-center gap-1.5 backdrop-blur-xs px-3 py-1 rounded-lg ${
+                          !certStatus.isPublished
+                            ? "bg-purple-900/50 text-purple-200 border border-purple-400/30"
+                            : "bg-black/40 text-white"
+                        }`}>
+                          {!certStatus.isPublished ? (
+                            <Lock className="w-3.5 h-3.5 text-amber-300" />
+                          ) : (
+                            <Clock className="w-3.5 h-3.5 text-[#F59E0B]" />
+                          )}
+                          <span>
+                            ফলাফল প্রকাশ: {competition.resultPublishDate}{" "}
+                            {!certStatus.isPublished ? "(সার্টিফিকেট ব্লার/লক)" : "(প্রকাশিত)"}
+                          </span>
                         </span>
                       )}
                     </div>
@@ -448,6 +497,34 @@ export default function CompetitionDetailsPage() {
                 {/* Timeline in non-image banner */}
                 {(competition.startDate || competition.endDate || competition.resultPublishDate) && (
                   <div className="flex items-center gap-3 flex-wrap text-xs text-gray-600 pt-1">
+                    {/* Registration Status Pill */}
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold border ${
+                        regStatus.status === "upcoming"
+                          ? "bg-amber-50 text-amber-900 border-amber-200"
+                          : regStatus.status === "ended"
+                          ? "bg-rose-50 text-rose-900 border-rose-200"
+                          : "bg-emerald-50 text-emerald-900 border-emerald-200"
+                      }`}
+                    >
+                      {regStatus.status === "upcoming" ? (
+                        <>
+                          <Clock className="w-3.5 h-3.5 text-amber-600" />
+                          <span>নিবন্ধন শুরু: {competition.startDate}</span>
+                        </>
+                      ) : regStatus.status === "ended" ? (
+                        <>
+                          <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                          <span>নিবন্ধন সমাপ্ত</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>নিবন্ধন চলছে</span>
+                        </>
+                      )}
+                    </span>
+
                     {(competition.startDate || competition.endDate) && (
                       <span className="inline-flex items-center gap-1.5 bg-blue-50 text-[#1A284A] px-3 py-1.5 rounded-xl border border-blue-100">
                         <Calendar className="w-3.5 h-3.5 text-[#29479B]" />
@@ -456,8 +533,15 @@ export default function CompetitionDetailsPage() {
                     )}
                     {competition.resultPublishDate && (
                       <span className="inline-flex items-center gap-1.5 bg-purple-50 text-purple-900 px-3 py-1.5 rounded-xl border border-purple-100">
-                        <Clock className="w-3.5 h-3.5 text-purple-600" />
-                        <span>ফলাফল প্রকাশ: {competition.resultPublishDate}</span>
+                        {!certStatus.isPublished ? (
+                          <Lock className="w-3.5 h-3.5 text-purple-700" />
+                        ) : (
+                          <Clock className="w-3.5 h-3.5 text-purple-600" />
+                        )}
+                        <span>
+                          ফলাফল প্রকাশ: {competition.resultPublishDate}{" "}
+                          {!certStatus.isPublished ? "(সার্টিফিকেট ব্লার/লক)" : "(প্রকাশিত)"}
+                        </span>
                       </span>
                     )}
                   </div>

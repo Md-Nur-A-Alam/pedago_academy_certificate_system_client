@@ -28,30 +28,57 @@ import { MultiImageUpload } from "@/components/ui/MultiImageUpload";
 import { toast } from "react-toastify";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
+import { getRegistrationStatus, getCertificateReleaseStatus } from "@/lib/dateUtils";
+import { Lock, Clock } from "lucide-react";
 
-const competitionFormSchema = z.object({
-  name: z.string().min(1, "Name is required").trim(),
-  description: z.string().optional().default(""),
-  refPrefix: z.string().min(1, "Prefix is required").trim(),
-  refPadding: z.coerce.number().min(0).max(6).default(0),
-  sourceLink: z.string().optional().default(""),
-  imageUrl: z.string().optional().default(""),
-  status: z.enum(["draft", "active", "archived"]).default("draft"),
-  minAge: z.coerce.number().min(0).max(120).default(0),
-  maxAge: z.coerce.number().min(0).max(120).default(0),
-  startDate: z.string().optional().default(""),
-  endDate: z.string().optional().default(""),
-  resultPublishDate: z.string().optional().default(""),
-  providesCertificate: z.boolean().default(true),
-  firstPrize: z.string().optional().default(""),
-  secondPrize: z.string().optional().default(""),
-  thirdPrize: z.string().optional().default(""),
-  topNPrizes: z.string().optional().default(""),
-  allParticipantPrize: z.string().optional().default(""),
-  mainRules: z.string().optional().default(""),
-  mainCriteria: z.string().optional().default(""),
-  galleryImages: z.array(z.string()).optional().default([]),
-});
+const competitionFormSchema = z
+  .object({
+    name: z.string().min(1, "Name is required").trim(),
+    description: z.string().optional().default(""),
+    refPrefix: z.string().min(1, "Prefix is required").trim(),
+    refPadding: z.coerce.number().min(0).max(6).default(0),
+    sourceLink: z.string().optional().default(""),
+    imageUrl: z.string().optional().default(""),
+    status: z.enum(["draft", "active", "archived"]).default("draft"),
+    minAge: z.coerce.number().min(0).max(120).default(0),
+    maxAge: z.coerce.number().min(0).max(120).default(0),
+    startDate: z.string().optional().default(""),
+    endDate: z.string().optional().default(""),
+    resultPublishDate: z.string().optional().default(""),
+    providesCertificate: z.boolean().default(true),
+    firstPrize: z.string().optional().default(""),
+    secondPrize: z.string().optional().default(""),
+    thirdPrize: z.string().optional().default(""),
+    topNPrizes: z.string().optional().default(""),
+    allParticipantPrize: z.string().optional().default(""),
+    mainRules: z.string().optional().default(""),
+    mainCriteria: z.string().optional().default(""),
+    galleryImages: z.array(z.string()).optional().default([]),
+  })
+  .refine(
+    (data) => {
+      if (data.startDate && data.endDate) {
+        return new Date(data.endDate) >= new Date(data.startDate);
+      }
+      return true;
+    },
+    {
+      message: "End Date must be on or after Start Date (শেষের তারিখ শুরুর তারিখের পর হতে হবে)",
+      path: ["endDate"],
+    }
+  )
+  .refine(
+    (data) => {
+      if (data.startDate && data.resultPublishDate) {
+        return new Date(data.resultPublishDate) >= new Date(data.startDate);
+      }
+      return true;
+    },
+    {
+      message: "Result Publish Date must be on or after Start Date (ফলাফল প্রকাশের তারিখ শুরুর তারিখের পর হতে হবে)",
+      path: ["resultPublishDate"],
+    }
+  );
 
 export function CompetitionForm({ initialData, onSubmit, onClose, isLoading }) {
   const queryClient = useQueryClient();
@@ -341,6 +368,24 @@ export function CompetitionForm({ initialData, onSubmit, onClose, isLoading }) {
   const providesCertificate = watch("providesCertificate");
   const formMainImg = watch("imageUrl");
   const formGroups = watch("categoryGroups") || [];
+  const watchedStartDate = watch("startDate");
+  const watchedEndDate = watch("endDate");
+  const watchedResultPublishDate = watch("resultPublishDate");
+
+  // Real-time preview of registration and certificate timeline behavior
+  const liveDateStatusPreview = useMemo(() => {
+    const dummy = {
+      startDate: watchedStartDate,
+      endDate: watchedEndDate,
+      resultPublishDate: watchedResultPublishDate,
+      providesCertificate: Boolean(providesCertificate),
+      status: "active",
+    };
+    return {
+      registration: getRegistrationStatus(dummy),
+      certificate: getCertificateReleaseStatus(dummy),
+    };
+  }, [watchedStartDate, watchedEndDate, watchedResultPublishDate, providesCertificate]);
 
   // Automatically aggregate all pictures linked to this competition
   const allLinkedItems = useMemo(() => {
@@ -585,47 +630,131 @@ export function CompetitionForm({ initialData, onSubmit, onClose, isLoading }) {
           </div>
 
           {/* Dates & Timeline Section */}
-          <div className="p-4 bg-blue-50/40 rounded-2xl border border-blue-100 space-y-3">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-[#29479B]" />
-              <label className="text-xs font-bold text-[#1A284A] uppercase tracking-wider">
-                Schedule & Timeline (সময়সীমা ও ফলাফল প্রকাশের তারিখ)
-              </label>
+          <div className="p-4 bg-blue-50/40 rounded-2xl border border-blue-100 space-y-4">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-[#29479B]" />
+                <label className="text-xs font-bold text-[#1A284A] uppercase tracking-wider">
+                  Schedule & Timeline (সময়সীমা ও ফলাফল প্রকাশের তারিখ)
+                </label>
+              </div>
+              <span className="text-[11px] font-semibold text-blue-700 bg-blue-100/80 px-2.5 py-0.5 rounded-full">
+                কার্যকরী তারিখ নিয়ন্ত্রণ (Functional Date Control)
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              {/* Start Date */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Start Date (শুরুর তারিখ)
+                  Start Date (নিবন্ধন শুরুর তারিখ)
                 </label>
                 <input
                   type="date"
-                  className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white text-xs sm:text-sm text-[#1A284A] focus:outline-none focus:ring-2 focus:ring-[#29479B]"
+                  className={`w-full px-3 py-2 rounded-xl border bg-white text-xs sm:text-sm text-[#1A284A] focus:outline-none focus:ring-2 focus:ring-[#29479B] ${
+                    errors.startDate ? "border-red-400" : "border-gray-300"
+                  }`}
                   {...register("startDate")}
                 />
+                <p className="text-[11px] text-gray-500 mt-1">
+                  🔒 এই তারিখের পূর্বে ব্যবহারকারীরা নিবন্ধন করতে পারবে না।
+                </p>
+                {errors.startDate && (
+                  <p className="text-red-500 text-[11px] mt-1 font-semibold">
+                    {errors.startDate.message}
+                  </p>
+                )}
               </div>
 
+              {/* End Date */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  End Date (শেষের তারিখ)
+                  End Date (নিবন্ধন শেষের তারিখ)
                 </label>
                 <input
                   type="date"
-                  className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white text-xs sm:text-sm text-[#1A284A] focus:outline-none focus:ring-2 focus:ring-[#29479B]"
+                  className={`w-full px-3 py-2 rounded-xl border bg-white text-xs sm:text-sm text-[#1A284A] focus:outline-none focus:ring-2 focus:ring-[#29479B] ${
+                    errors.endDate ? "border-red-400" : "border-gray-300"
+                  }`}
                   {...register("endDate")}
                 />
+                <p className="text-[11px] text-gray-500 mt-1">
+                  🔒 এই তারিখের পর নিবন্ধন স্বয়ংক্রিয়ভাবে বন্ধ হয়ে যাবে।
+                </p>
+                {errors.endDate && (
+                  <p className="text-red-500 text-[11px] mt-1 font-semibold">
+                    {errors.endDate.message}
+                  </p>
+                )}
               </div>
 
+              {/* Result Publish Date */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
                   Result Publish Date (ফলাফল প্রকাশ)
                 </label>
                 <input
                   type="date"
-                  className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white text-xs sm:text-sm text-[#1A284A] focus:outline-none focus:ring-2 focus:ring-[#29479B]"
+                  className={`w-full px-3 py-2 rounded-xl border bg-white text-xs sm:text-sm text-[#1A284A] focus:outline-none focus:ring-2 focus:ring-[#29479B] ${
+                    errors.resultPublishDate ? "border-red-400" : "border-gray-300"
+                  }`}
                   {...register("resultPublishDate")}
                 />
+                <p className="text-[11px] text-gray-500 mt-1">
+                  🔒 এই তারিখের পূর্বে সার্টিফিকেট ব্লার থাকবে ও ডাউনলোড বন্ধ থাকবে।
+                </p>
+                {errors.resultPublishDate && (
+                  <p className="text-red-500 text-[11px] mt-1 font-semibold">
+                    {errors.resultPublishDate.message}
+                  </p>
+                )}
               </div>
+            </div>
+
+            {/* Live Timeline Status Preview */}
+            <div className="bg-white/80 p-3 rounded-xl border border-blue-200/70 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-[#1A284A]">বর্তমান লাইভ আচরণ:</span>
+                <span
+                  className={`px-2 py-0.5 rounded-full font-bold text-[11px] ${
+                    liveDateStatusPreview.registration.isOpen
+                      ? "bg-emerald-100 text-emerald-800"
+                      : liveDateStatusPreview.registration.status === "upcoming"
+                      ? "bg-amber-100 text-amber-800"
+                      : "bg-rose-100 text-rose-800"
+                  }`}
+                >
+                  নিবন্ধন:{" "}
+                  {liveDateStatusPreview.registration.isOpen
+                    ? "চলমান (Open)"
+                    : liveDateStatusPreview.registration.status === "upcoming"
+                    ? "শুরু হয়নি (Blocked)"
+                    : "সমাপ্ত (Closed)"}
+                </span>
+
+                <span
+                  className={`px-2 py-0.5 rounded-full font-bold text-[11px] ${
+                    !providesCertificate
+                      ? "bg-gray-100 text-gray-600"
+                      : liveDateStatusPreview.certificate.isPublished
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-purple-100 text-purple-800"
+                  }`}
+                >
+                  সার্টিফিকেট:{" "}
+                  {!providesCertificate
+                    ? "প্রযোজ্য নয়"
+                    : liveDateStatusPreview.certificate.isPublished
+                    ? "উন্মুক্ত ও ডাউনলোডযোগ্য"
+                    : "ব্লার প্রিভিউ (ডাউনলোড লক)"}
+                </span>
+              </div>
+
+              <span className="text-[11px] text-gray-500">
+                {watchedResultPublishDate
+                  ? `ফলাফল প্রকাশ: ${watchedResultPublishDate}`
+                  : "ফলাফল প্রকাশের তারিখ নির্ধারিত নেই"}
+              </span>
             </div>
           </div>
 

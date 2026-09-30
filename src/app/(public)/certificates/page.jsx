@@ -16,6 +16,8 @@ import {
   Tag,
   Calendar,
   ExternalLink,
+  Lock,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -23,6 +25,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import apiClient from "@/lib/api-client";
 import { toast } from "react-toastify";
 import { buildCanvasFont, parseStyleBooleans } from "@/lib/fontConstants";
+import { parseLocalDate } from "@/lib/dateUtils";
 
 export default function CertificatesPage() {
   const [query, setQuery] = useState("");
@@ -39,6 +42,26 @@ export default function CertificatesPage() {
   const activeResult = resultsList[selectedIndex] || null;
   const participantData = activeResult?.participant || null;
   const certTemplate = activeResult?.certificateTemplate || null;
+
+  const resultPublishDate =
+    participantData?.resultPublishDate ||
+    participantData?.competition?.resultPublishDate ||
+    activeResult?.resultPublishDate ||
+    "";
+
+  const isResultPublished = (() => {
+    if (!resultPublishDate) return true;
+    if (activeResult?.isResultPublished === false) return false;
+    const resDate = parseLocalDate(resultPublishDate, false);
+    if (!resDate) return true;
+    return new Date() >= resDate;
+  })();
+
+  const canDownloadActiveCertificate = Boolean(
+    isResultPublished &&
+      activeResult?.canDownloadCertificate !== false &&
+      participantData?.competition?.providesCertificate !== false
+  );
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -162,6 +185,20 @@ export default function CertificatesPage() {
   // Helper to generate & download a certificate given participant and template
   const generateAndDownloadCertificate = (participant, template) => {
     return new Promise((resolve, reject) => {
+      const pubDate =
+        participant?.resultPublishDate ||
+        participant?.competition?.resultPublishDate ||
+        "";
+      if (pubDate) {
+        const parsed = parseLocalDate(pubDate, false);
+        if (parsed && new Date() < parsed) {
+          toast.warning(
+            `ফলাফল প্রকাশের তারিখের পূর্বে সার্টিফিকেট ডাউনলোড করা যাবে না। নির্ধারিত তারিখ: ${pubDate}`
+          );
+          return reject(new Error("Result not published yet"));
+        }
+      }
+
       if (!template?.backgroundImageUrl) {
         toast.error("Certificate template artwork unavailable");
         return reject(new Error("No artwork"));
@@ -327,6 +364,13 @@ export default function CertificatesPage() {
 
   // Download High-Resolution Certificate for currently selected item
   const handleDownloadActiveCertificate = async () => {
+    if (!isResultPublished) {
+      toast.warning(
+        `ফলাফল প্রকাশের তারিখের পূর্বে সার্টিফিকেট ডাউনলোড করা যাবে না। ফলাফল প্রকাশের নির্ধারিত তারিখ: ${resultPublishDate}`
+      );
+      return;
+    }
+
     if (!participantData || !certTemplate) {
       toast.error("Certificate template artwork unavailable");
       return;
@@ -345,20 +389,40 @@ export default function CertificatesPage() {
   // Download All Matching Certificates Sequentially
   const handleDownloadAllCertificates = async () => {
     if (resultsList.length === 0) return;
+
+    // Filter only eligible items whose results are published
+    const eligibleItems = resultsList.filter((item) => {
+      if (!item.certificateTemplate) return false;
+      const pubDate =
+        item.participant?.resultPublishDate ||
+        item.participant?.competition?.resultPublishDate ||
+        item.resultPublishDate ||
+        "";
+      if (!pubDate) return true;
+      if (item.isResultPublished === false) return false;
+      const parsed = parseLocalDate(pubDate, false);
+      return parsed ? new Date() >= parsed : true;
+    });
+
+    if (eligibleItems.length === 0) {
+      toast.warning(
+        "ফলাফল প্রকাশের তারিখের পূর্বে কোনো সার্টিফিকেট ডাউনলোড করা সম্ভব নয়।"
+      );
+      return;
+    }
+
     setIsDownloadingAll(true);
     let successCount = 0;
 
-    for (let i = 0; i < resultsList.length; i++) {
-      const item = resultsList[i];
-      if (item.certificateTemplate) {
-        try {
-          await generateAndDownloadCertificate(item.participant, item.certificateTemplate);
-          successCount++;
-          // Delay to prevent browser throttling downloads
-          await new Promise((r) => setTimeout(r, 600));
-        } catch {
-          // Continue with remaining
-        }
+    for (let i = 0; i < eligibleItems.length; i++) {
+      const item = eligibleItems[i];
+      try {
+        await generateAndDownloadCertificate(item.participant, item.certificateTemplate);
+        successCount++;
+        // Delay to prevent browser throttling downloads
+        await new Promise((r) => setTimeout(r, 600));
+      } catch {
+        // Continue with remaining
       }
     }
 
@@ -497,15 +561,37 @@ export default function CertificatesPage() {
                         <span className="font-mono font-bold text-gray-700">
                           {p.refNumber}
                         </span>
-                        {hasTemplate ? (
-                          <span className="text-emerald-600 font-semibold text-[11px] flex items-center gap-1">
-                            <Check className="w-3 h-3" /> Ready
-                          </span>
-                        ) : (
-                          <span className="text-amber-600 font-semibold text-[11px]">
-                            In Prep
-                          </span>
-                        )}
+                        {(() => {
+                          const itemPubDate =
+                            p.resultPublishDate ||
+                            p.competition?.resultPublishDate ||
+                            resItem.resultPublishDate ||
+                            "";
+                          const itemPublished = (() => {
+                            if (!itemPubDate) return true;
+                            if (resItem.isResultPublished === false) return false;
+                            const d = parseLocalDate(itemPubDate, false);
+                            return d ? new Date() >= d : true;
+                          })();
+
+                          if (!itemPublished) {
+                            return (
+                              <span className="text-amber-700 bg-amber-50 border border-amber-200 font-semibold text-[11px] px-2 py-0.5 rounded flex items-center gap-1">
+                                <Lock className="w-3 h-3 text-amber-600" /> প্রকাশের অপেক্ষায়
+                              </span>
+                            );
+                          }
+
+                          return hasTemplate ? (
+                            <span className="text-emerald-600 font-semibold text-[11px] flex items-center gap-1">
+                              <Check className="w-3 h-3" /> Ready
+                            </span>
+                          ) : (
+                            <span className="text-amber-600 font-semibold text-[11px]">
+                              In Prep
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -518,19 +604,44 @@ export default function CertificatesPage() {
                         {isSelected ? "● Currently Viewing" : "Click to view"}
                       </span>
 
-                      {hasTemplate && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            generateAndDownloadCertificate(p, resItem.certificateTemplate);
-                          }}
-                          className="p-1.5 rounded-lg bg-gray-100 hover:bg-[#29479B] text-gray-600 hover:text-white transition-colors"
-                          title="Quick Download this Certificate"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                      {hasTemplate && (() => {
+                        const itemPubDate =
+                          p.resultPublishDate ||
+                          p.competition?.resultPublishDate ||
+                          resItem.resultPublishDate ||
+                          "";
+                        const itemPublished = (() => {
+                          if (!itemPubDate) return true;
+                          if (resItem.isResultPublished === false) return false;
+                          const d = parseLocalDate(itemPubDate, false);
+                          return d ? new Date() >= d : true;
+                        })();
+
+                        if (!itemPublished) {
+                          return (
+                            <span
+                              className="p-1.5 rounded-lg bg-amber-50 text-amber-600 cursor-not-allowed"
+                              title={`Locked until ${itemPubDate}`}
+                            >
+                              <Lock className="w-3.5 h-3.5" />
+                            </span>
+                          );
+                        }
+
+                        return (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              generateAndDownloadCertificate(p, resItem.certificateTemplate);
+                            }}
+                            className="p-1.5 rounded-lg bg-gray-100 hover:bg-[#29479B] text-gray-600 hover:text-white transition-colors"
+                            title="Quick Download this Certificate"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
                 );
@@ -609,128 +720,190 @@ export default function CertificatesPage() {
               </div>
             </div>
 
+            {/* Pending Result Notification Banner */}
+            {!isResultPublished && (
+              <div className="bg-gradient-to-r from-amber-50/90 via-orange-50/70 to-amber-50/90 border-2 border-amber-200/90 p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+                <div className="flex items-start sm:items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 shadow-2xs">
+                    <Clock className="w-6 h-6 animate-pulse" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="font-extrabold text-amber-950 text-base flex items-center gap-2 flex-wrap">
+                      ফলাফল প্রকাশের অপেক্ষায় (Result Not Published Yet)
+                      <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-200/80 text-amber-900 font-bold border border-amber-300">
+                        সার্টিফিকেট লক করা আছে
+                      </span>
+                    </h3>
+                    <p className="text-xs sm:text-sm text-amber-800 leading-relaxed">
+                      ফলাফল প্রকাশের নির্ধারিত তারিখের পূর্বে সার্টিফিকেট স্পষ্ট দেখা বা ডাউনলোড করা যাবে না। আপনার নিবন্ধন ও ক্রেডেনশিয়াল সুরক্ষিত রয়েছে।
+                    </p>
+                    <div className="flex items-center gap-2 flex-wrap pt-1">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-amber-200/80 text-amber-950 border border-amber-300/60">
+                        <Calendar className="w-3.5 h-3.5 text-amber-800" />
+                        ফলাফল প্রকাশের নির্ধারিত তারিখ: {resultPublishDate}
+                      </span>
+                      <span className="text-xs text-amber-700 font-medium">
+                        অনুগ্রহ করে ফলাফল প্রকাশের তারিখ পর্যন্ত অপেক্ষা করুন।
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Certificate Template Preview */}
             {certTemplate ? (
               <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200/80 space-y-6">
                 <div className="flex items-center justify-between text-xs text-gray-500">
                   <span className="font-bold text-gray-700 flex items-center gap-1.5">
                     <Sparkles className="w-4 h-4 text-amber-500" />
-                    Live Certificate Preview ({participantData.category || "General"})
+                    {isResultPublished ? "Live Certificate Preview" : "Protected Certificate Preview (Blurred)"} ({participantData.category || "General"})
                   </span>
                   <span>Format: Landscape Official Credential</span>
                 </div>
 
                 <div
                   ref={containerRef}
-                  className="relative w-full rounded-xl overflow-hidden border-2 border-gray-200 shadow-md bg-white select-none max-w-2xl mx-auto"
+                  className={`relative w-full rounded-xl overflow-hidden border-2 ${
+                    !isResultPublished ? "border-amber-300 bg-slate-900" : "border-gray-200 bg-white"
+                  } shadow-md select-none max-w-2xl mx-auto`}
                   style={{ aspectRatio: "16 / 9" }}
                 >
-                  {/* Background Certificate Artwork */}
-                  {certTemplate.backgroundImageUrl && (
-                    <img
-                      src={certTemplate.backgroundImageUrl}
-                      alt="Certificate Background"
-                      className="w-full h-full object-cover pointer-events-none"
-                      crossOrigin="anonymous"
-                    />
-                  )}
-
-                  {/* Rendered Name */}
-                  {nameZone.enabled !== false && (() => {
-                    const { isBold, isItalic } = parseStyleBooleans(nameZone.style);
-                    return (
-                      <div
-                        className="absolute select-none pointer-events-none"
-                        style={{
-                          left: `${nameZone.x}%`,
-                          top: `${nameZone.y}%`,
-                          transform: getTransform(nameZone.align, nameZone.rotation),
-                          fontFamily: nameZone.font || "Great Vibes",
-                          fontSize: `${scaleFont(nameZone.size)}px`,
-                          fontWeight: isBold ? "bold" : "normal",
-                          fontStyle: isItalic ? "italic" : "normal",
-                          color: nameZone.color || "#1A284A",
-                          textAlign: nameZone.align || "center",
-                          whiteSpace: "nowrap",
-                          lineHeight: 1.2,
-                          zIndex: 25,
-                        }}
-                      >
-                        {participantData.name}
-                      </div>
-                    );
-                  })()}
-
-                  {/* Rendered Reference Code */}
-                  {refZone.enabled !== false && (() => {
-                    const { isBold, isItalic } = parseStyleBooleans(refZone.style);
-                    return (
-                      <div
-                        className="absolute select-none pointer-events-none"
-                        style={{
-                          left: `${refZone.x}%`,
-                          top: `${refZone.y}%`,
-                          transform: getTransform(refZone.align, refZone.rotation),
-                          fontFamily: refZone.font || "Montserrat",
-                          fontSize: `${scaleFont(refZone.size)}px`,
-                          fontWeight: isBold ? "bold" : "normal",
-                          fontStyle: isItalic ? "italic" : "normal",
-                          color: refZone.color || "#29479B",
-                          textAlign: refZone.align || "center",
-                          whiteSpace: "nowrap",
-                          lineHeight: 1.2,
-                          zIndex: 25,
-                        }}
-                      >
-                        {participantData.refNumber}
-                      </div>
-                    );
-                  })()}
-
-                  {/* Rendered Date Field */}
-                  {Boolean(dateZone.enabled) && (() => {
-                    const { isBold, isItalic } = parseStyleBooleans(dateZone.style);
-                    return (
-                      <div
-                        className="absolute select-none pointer-events-none"
-                        style={{
-                          left: `${dateZone.x}%`,
-                          top: `${dateZone.y}%`,
-                          transform: getTransform(dateZone.align, dateZone.rotation),
-                          fontFamily: dateZone.font || "Montserrat",
-                          fontSize: `${scaleFont(dateZone.size)}px`,
-                          fontWeight: isBold ? "bold" : "normal",
-                          fontStyle: isItalic ? "italic" : "normal",
-                          color: dateZone.color || "#1A284A",
-                          textAlign: dateZone.align || "center",
-                          whiteSpace: "nowrap",
-                          lineHeight: 1.2,
-                          zIndex: 25,
-                        }}
-                      >
-                        {dateZone.format || "20 September 2026"}
-                      </div>
-                    );
-                  })()}
-
-                  {/* Rendered Signature PNG */}
-                  {Boolean(signatureZone.enabled && signatureZone.imageUrl) && (
-                    <div
-                      className="absolute select-none pointer-events-none"
-                      style={{
-                        left: `${signatureZone.x}%`,
-                        top: `${signatureZone.y}%`,
-                        width: `${signatureZone.width || 16}%`,
-                        transform: `translate(-50%, -50%) rotate(${signatureZone.rotation || 0}deg)`,
-                        zIndex: 25,
-                      }}
-                    >
+                  {/* Inner Certificate Artwork & Texts (Blurred when unreleased) */}
+                  <div
+                    className={`w-full h-full relative ${
+                      !isResultPublished ? "filter blur-[16px] pointer-events-none select-none scale-[1.04]" : ""
+                    }`}
+                  >
+                    {/* Background Certificate Artwork */}
+                    {certTemplate.backgroundImageUrl && (
                       <img
-                        src={signatureZone.imageUrl}
-                        alt="Signature"
-                        className="w-full h-auto block select-none pointer-events-none drop-shadow-xs"
+                        src={certTemplate.backgroundImageUrl}
+                        alt="Certificate Background"
+                        className="w-full h-full object-cover pointer-events-none"
                         crossOrigin="anonymous"
                       />
+                    )}
+
+                    {/* Rendered Name */}
+                    {nameZone.enabled !== false && (() => {
+                      const { isBold, isItalic } = parseStyleBooleans(nameZone.style);
+                      return (
+                        <div
+                          className="absolute select-none pointer-events-none"
+                          style={{
+                            left: `${nameZone.x}%`,
+                            top: `${nameZone.y}%`,
+                            transform: getTransform(nameZone.align, nameZone.rotation),
+                            fontFamily: nameZone.font || "Great Vibes",
+                            fontSize: `${scaleFont(nameZone.size)}px`,
+                            fontWeight: isBold ? "bold" : "normal",
+                            fontStyle: isItalic ? "italic" : "normal",
+                            color: nameZone.color || "#1A284A",
+                            textAlign: nameZone.align || "center",
+                            whiteSpace: "nowrap",
+                            lineHeight: 1.2,
+                            zIndex: 25,
+                          }}
+                        >
+                          {participantData.name}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Rendered Reference Code */}
+                    {refZone.enabled !== false && (() => {
+                      const { isBold, isItalic } = parseStyleBooleans(refZone.style);
+                      return (
+                        <div
+                          className="absolute select-none pointer-events-none"
+                          style={{
+                            left: `${refZone.x}%`,
+                            top: `${refZone.y}%`,
+                            transform: getTransform(refZone.align, refZone.rotation),
+                            fontFamily: refZone.font || "Montserrat",
+                            fontSize: `${scaleFont(refZone.size)}px`,
+                            fontWeight: isBold ? "bold" : "normal",
+                            fontStyle: isItalic ? "italic" : "normal",
+                            color: refZone.color || "#29479B",
+                            textAlign: refZone.align || "center",
+                            whiteSpace: "nowrap",
+                            lineHeight: 1.2,
+                            zIndex: 25,
+                          }}
+                        >
+                          {participantData.refNumber}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Rendered Date Field */}
+                    {Boolean(dateZone.enabled) && (() => {
+                      const { isBold, isItalic } = parseStyleBooleans(dateZone.style);
+                      return (
+                        <div
+                          className="absolute select-none pointer-events-none"
+                          style={{
+                            left: `${dateZone.x}%`,
+                            top: `${dateZone.y}%`,
+                            transform: getTransform(dateZone.align, dateZone.rotation),
+                            fontFamily: dateZone.font || "Montserrat",
+                            fontSize: `${scaleFont(dateZone.size)}px`,
+                            fontWeight: isBold ? "bold" : "normal",
+                            fontStyle: isItalic ? "italic" : "normal",
+                            color: dateZone.color || "#1A284A",
+                            textAlign: dateZone.align || "center",
+                            whiteSpace: "nowrap",
+                            lineHeight: 1.2,
+                            zIndex: 25,
+                          }}
+                        >
+                          {dateZone.format || "20 September 2026"}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Rendered Signature PNG */}
+                    {Boolean(signatureZone.enabled && signatureZone.imageUrl) && (
+                      <div
+                        className="absolute select-none pointer-events-none"
+                        style={{
+                          left: `${signatureZone.x}%`,
+                          top: `${signatureZone.y}%`,
+                          width: `${signatureZone.width || 16}%`,
+                          transform: `translate(-50%, -50%) rotate(${signatureZone.rotation || 0}deg)`,
+                          zIndex: 25,
+                        }}
+                      >
+                        <img
+                          src={signatureZone.imageUrl}
+                          alt="Signature"
+                          className="w-full h-auto block select-none pointer-events-none drop-shadow-xs"
+                          crossOrigin="anonymous"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dark Glassmorphic Lock Overlay when Result Not Published */}
+                  {!isResultPublished && (
+                    <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-xs flex flex-col items-center justify-center text-center p-6 z-30 select-none">
+                      <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-2xl bg-white/95 text-amber-600 flex items-center justify-center shadow-xl mb-3 border border-amber-200">
+                        <Lock className="w-6 h-6 sm:w-8 sm:h-8" />
+                      </div>
+                      <h4 className="text-base sm:text-xl font-black text-white drop-shadow-md">
+                        সার্টিফিকেট প্রিভিউ ব্লার ও লক করা আছে
+                      </h4>
+                      <p className="text-xs sm:text-sm text-white/90 max-w-md mt-1 drop-shadow-sm font-medium">
+                        ফলাফল প্রকাশের তারিখের পূর্বে সার্টিফিকেট দেখা বা ডাউনলোড করা যাবে না।
+                      </p>
+                      <div className="mt-3.5 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/50 backdrop-blur-md text-amber-300 text-xs font-bold border border-amber-300/40 shadow-xs">
+                        <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                        ফলাফল প্রকাশের তারিখ: {resultPublishDate}
+                      </div>
+                      <p className="text-[11px] text-white/80 mt-2 font-medium">
+                        নির্ধারিত তারিখে ফলাফল প্রকাশ হওয়া মাত্র আপনার মূল সার্টিফিকেট সম্পূর্ণ উন্মুক্ত হবে।
+                      </p>
                     </div>
                   )}
                 </div>
@@ -738,7 +911,9 @@ export default function CertificatesPage() {
                 {/* Download Actions */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-100">
                   <span className="text-xs text-gray-500">
-                    High-resolution ready for printing or portfolio sharing.
+                    {isResultPublished
+                      ? "High-resolution ready for printing or portfolio sharing."
+                      : `ফলাফল প্রকাশের তারিখ: ${resultPublishDate} তারিখে সার্টিফিকেট উন্মুক্ত হবে।`}
                   </span>
 
                   <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
@@ -748,8 +923,12 @@ export default function CertificatesPage() {
                         variant="outline"
                         size="lg"
                         onClick={handleDownloadAllCertificates}
-                        disabled={isDownloadingAll}
-                        className="w-full sm:w-auto gap-2 text-xs font-bold text-[#29479B] border-blue-300 hover:bg-blue-50"
+                        disabled={isDownloadingAll || !isResultPublished}
+                        className={`w-full sm:w-auto gap-2 text-xs font-bold ${
+                          isResultPublished
+                            ? "text-[#29479B] border-blue-300 hover:bg-blue-50"
+                            : "text-gray-400 border-gray-200 cursor-not-allowed"
+                        }`}
                       >
                         {isDownloadingAll ? (
                           <>
@@ -765,15 +944,25 @@ export default function CertificatesPage() {
 
                     <Button
                       type="button"
-                      variant="primary"
+                      variant={isResultPublished ? "primary" : "secondary"}
                       size="lg"
                       onClick={handleDownloadActiveCertificate}
-                      disabled={isDownloading}
-                      className="w-full sm:w-auto gap-2 bg-[#29479B] hover:bg-[#1A284A] text-white shadow-md hover:shadow-lg transition-all"
+                      disabled={isDownloading || !isResultPublished}
+                      className={`w-full sm:w-auto gap-2 ${
+                        isResultPublished
+                          ? "bg-[#29479B] hover:bg-[#1A284A] text-white shadow-md hover:shadow-lg transition-all"
+                          : "bg-gray-200 text-gray-600 cursor-not-allowed border border-gray-300 shadow-none font-semibold text-xs sm:text-sm"
+                      }`}
+                      title={!isResultPublished ? `Available on ${resultPublishDate}` : ""}
                     >
                       {isDownloading ? (
                         <>
                           <Spinner size="sm" /> Generating File...
+                        </>
+                      ) : !isResultPublished ? (
+                        <>
+                          <Lock className="w-4 h-4 text-amber-600" />
+                          <span>ফলাফল প্রকাশ পর্যন্ত অপেক্ষা করুন ({resultPublishDate})</span>
                         </>
                       ) : (
                         <>
@@ -783,6 +972,14 @@ export default function CertificatesPage() {
                     </Button>
                   </div>
                 </div>
+              </div>
+            ) : !isResultPublished ? (
+              <div className="bg-white p-8 rounded-2xl border border-amber-200 text-center space-y-3 shadow-xs">
+                <Clock className="w-10 h-10 text-amber-500 mx-auto animate-pulse" />
+                <h3 className="font-bold text-gray-800 text-base">সার্টিফিকেট ফলাফল প্রকাশের অপেক্ষায়</h3>
+                <p className="text-sm text-gray-600 max-w-md mx-auto">
+                  ফলাফল প্রকাশের তারিখের পূর্বে সার্টিফিকেট দেখা বা ডাউনলোড করা যাবে না। ফলাফল প্রকাশের নির্ধারিত তারিখ: <strong>{resultPublishDate}</strong>। অনুগ্রহ করে নির্ধারিত তারিখ পর্যন্ত অপেক্ষা করুন।
+                </p>
               </div>
             ) : (
               <div className="bg-white p-8 rounded-2xl border border-gray-200 text-center space-y-3">

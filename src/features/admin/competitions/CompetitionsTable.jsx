@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Edit, Trash2, Plus, Search, ExternalLink } from "lucide-react";
+import { Edit, Trash2, Plus, Search, ExternalLink, Calendar, Lock } from "lucide-react";
 import { useCompetitions } from "./useCompetitions";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -12,6 +12,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Modal } from "@/components/ui/Modal";
 import { CompetitionForm } from "./CompetitionForm";
+import { getRegistrationStatus, getCertificateReleaseStatus } from "@/lib/dateUtils";
 
 export function CompetitionsTable() {
   const [search, setSearch] = useState("");
@@ -120,7 +121,7 @@ export function CompetitionsTable() {
                   <th className="px-6 py-4">Competition Name</th>
                   <th className="px-6 py-4">Category</th>
                   <th className="px-6 py-4">Ref Prefix</th>
-                  <th className="px-6 py-4">Padding</th>
+                  <th className="px-6 py-4">Timeline & Dates</th>
                   <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
@@ -147,7 +148,50 @@ export function CompetitionsTable() {
                     <td className="px-6 py-4 font-mono text-xs text-[#29479B] font-bold">
                       {comp.refPrefix}
                     </td>
-                    <td className="px-6 py-4 text-xs font-mono">{comp.refPadding} digits</td>
+                    <td className="px-6 py-4">
+                      {(() => {
+                        const reg = getRegistrationStatus(comp);
+                        const cert = getCertificateReleaseStatus(comp);
+                        return (
+                          <div className="space-y-1 text-xs">
+                            {(comp.startDate || comp.endDate) ? (
+                              <div className="flex items-center gap-1.5 text-[11px] text-gray-600">
+                                <Calendar className="w-3.5 h-3.5 text-[#29479B] shrink-0" />
+                                <span>{comp.startDate || "শুরু"} — {comp.endDate || "শেষ"}</span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 text-[11px]">তারিখ নির্ধারিত নেই</span>
+                            )}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                  reg.isOpen
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : reg.status === "upcoming"
+                                    ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                    : "bg-rose-50 text-rose-700 border border-rose-200"
+                                }`}
+                              >
+                                {reg.isOpen ? "নিবন্ধন চলছে" : reg.status === "upcoming" ? "শুরু হয়নি" : "নিবন্ধন সমাপ্ত"}
+                              </span>
+                              {comp.resultPublishDate && (
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-0.5 ${
+                                    cert.isPublished
+                                      ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                      : "bg-purple-50 text-purple-700 border border-purple-200"
+                                  }`}
+                                  title={`ফলাফল প্রকাশ: ${comp.resultPublishDate}`}
+                                >
+                                  {!cert.isPublished && <Lock className="w-2.5 h-2.5" />}
+                                  {cert.isPublished ? "ফলাফল প্রকাশিত" : `ফলাফল: ${comp.resultPublishDate}`}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="px-6 py-4">
                       <Badge variant={statusBadgeVariant[comp.status] || "info"}>
                         {comp.status}

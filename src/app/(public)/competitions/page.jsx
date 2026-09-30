@@ -20,8 +20,11 @@ import {
   RotateCcw,
   CheckCircle2,
   UserPlus,
+  Clock,
+  Lock,
 } from "lucide-react";
 import { ParticipantRegistrationSection } from "@/features/participants";
+import { getRegistrationStatus, getCertificateReleaseStatus } from "@/lib/dateUtils";
 
 const TOPIC_ICONS = {
   "ছবি আঁকা": "🎨",
@@ -263,6 +266,8 @@ export default function CompetitionsPage() {
               const isArchived = comp.status === "archived";
               const primaryTopic = comp.topicType || (comp.topicTypes && comp.topicTypes[0]) || "সাধারণ";
               const topicIcon = TOPIC_ICONS[primaryTopic] || "🏆";
+              const regStatus = getRegistrationStatus(comp);
+              const certStatus = getCertificateReleaseStatus(comp);
 
               return (
                 <div
@@ -298,15 +303,16 @@ export default function CompetitionsPage() {
                       {/* Status chip on top right */}
                       <div className="absolute top-3 right-3">
                         <span
-                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold backdrop-blur-xs ${
-                            isActive
-                              ? "bg-emerald-600/90 text-white shadow-xs"
-                              : isArchived
-                              ? "bg-gray-800/80 text-white"
-                              : "bg-amber-600/90 text-white"
+                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold backdrop-blur-xs shadow-xs ${
+                            regStatus.status === "open"
+                              ? "bg-emerald-600/95 text-white"
+                              : regStatus.status === "upcoming"
+                              ? "bg-amber-600/95 text-white"
+                              : "bg-gray-800/80 text-white"
                           }`}
                         >
-                          {isActive ? "চলমান" : "সম্পন্ন"}
+                          {regStatus.status === "open" && <span className="w-1.5 h-1.5 rounded-full bg-white mr-1.5 animate-pulse" />}
+                          {regStatus.labelBn}
                         </span>
                       </div>
                     </Link>
@@ -316,7 +322,7 @@ export default function CompetitionsPage() {
                     <div className="space-y-3">
                       {/* Badge row if no image */}
                       {!comp.imageUrl && (
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-[#29479B]/10 text-[#29479B]">
                             <span className="mr-1">{topicIcon}</span>
                             {primaryTopic}
@@ -324,14 +330,23 @@ export default function CompetitionsPage() {
 
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                              isActive
-                                ? "bg-emerald-100 text-emerald-800"
-                                : isArchived
-                                ? "bg-gray-100 text-gray-700"
-                                : "bg-amber-100 text-amber-800"
+                              regStatus.status === "open"
+                                ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                : regStatus.status === "upcoming"
+                                ? "bg-amber-100 text-amber-800 border border-amber-200"
+                                : "bg-gray-100 text-gray-700 border border-gray-200"
                             }`}
                           >
-                            {isActive ? "চলমান" : "সম্পন্ন"}
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                                regStatus.status === "open"
+                                  ? "bg-emerald-500"
+                                  : regStatus.status === "upcoming"
+                                  ? "bg-amber-500"
+                                  : "bg-gray-400"
+                              }`}
+                            />
+                            {regStatus.labelBn}
                           </span>
                         </div>
                       )}
@@ -354,8 +369,23 @@ export default function CompetitionsPage() {
                           <div className="flex items-center gap-1.5 text-[11px]">
                             <Calendar className="w-3.5 h-3.5 text-[#F59E0B] shrink-0" />
                             <span>
-                              সময়সীমা: <strong>{comp.startDate || "শুরু"}</strong> থেকে{" "}
+                              নিবন্ধন সময়সীমা: <strong>{comp.startDate || "শুরু"}</strong> থেকে{" "}
                               <strong>{comp.endDate || "শেষ"}</strong>
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Result Publish Date Indicator */}
+                        {comp.resultPublishDate && (
+                          <div className="flex items-center gap-1.5 text-[11px]">
+                            {certStatus.isPublished ? (
+                              <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            ) : (
+                              <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                            )}
+                            <span className={certStatus.isPublished ? "text-emerald-700 font-semibold" : "text-amber-800"}>
+                              ফলাফল ও সার্টিফিকেট: <strong>{comp.resultPublishDate}</strong>
+                              {!certStatus.isPublished && " (অপেক্ষমান)"}
                             </span>
                           </div>
                         )}
@@ -392,9 +422,17 @@ export default function CompetitionsPage() {
                           )}
 
                           {comp.providesCertificate !== false ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md ml-auto">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                              সার্টিফিকেট সহ
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md ml-auto ${
+                              certStatus.isPublished
+                                ? "text-emerald-700 bg-emerald-50"
+                                : "text-amber-700 bg-amber-50 border border-amber-200/60"
+                            }`}>
+                              {certStatus.isPublished ? (
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              ) : (
+                                <Lock className="w-3 h-3 text-amber-600" />
+                              )}
+                              {certStatus.isPublished ? "সার্টিফিকেট উপলব্ধ" : "সার্টিফিকেট অপেক্ষমান"}
                             </span>
                           ) : (
                             <span className="text-[10px] text-gray-400 ml-auto">
@@ -419,9 +457,14 @@ export default function CompetitionsPage() {
                         {comp.providesCertificate !== false ? (
                           <Link
                             href={`/certificates?competitionId=${comp._id}`}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-[#29479B] text-white hover:bg-[#1A284A] shadow-xs hover:shadow-md transition-all"
+                            className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl transition-all shadow-xs hover:shadow-md ${
+                              certStatus.isPublished
+                                ? "bg-[#29479B] text-white hover:bg-[#1A284A]"
+                                : "bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100"
+                            }`}
                           >
-                            <span>সার্টিফিকেট</span>
+                            {!certStatus.isPublished && <Lock className="w-3 h-3 text-amber-700" />}
+                            <span>{certStatus.isPublished ? "সার্টিফিকেট" : "ফলাফল লকড"}</span>
                             <ArrowRight className="w-3.5 h-3.5" />
                           </Link>
                         ) : null}

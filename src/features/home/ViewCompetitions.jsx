@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Trophy, Tag, Calendar, ArrowRight, ExternalLink, Info, Camera, Layers } from "lucide-react";
+import { Trophy, Tag, Calendar, ArrowRight, ExternalLink, Info, Camera, Layers, Lock, Clock } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
 import { Badge } from "@/components/ui/Badge";
 import { useHomepageSettings } from "@/hooks/useHomepageSettings";
+import { getRegistrationStatus, getCertificateReleaseStatus } from "@/lib/dateUtils";
 
 export function ViewCompetitions() {
   const { settings } = useHomepageSettings();
@@ -85,6 +86,8 @@ export function ViewCompetitions() {
             {competitions.map((comp) => {
               const isActive = comp.status === "active";
               const isArchived = comp.status === "archived";
+              const regStatus = getRegistrationStatus(comp);
+              const certStatus = getCertificateReleaseStatus(comp);
 
               return (
                 <div
@@ -114,12 +117,28 @@ export function ViewCompetitions() {
                           </span>
                         )}
                       </div>
+
+                      {/* Registration status badge on banner */}
+                      <div className="absolute top-3 right-3">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold backdrop-blur-xs shadow-xs ${
+                            regStatus.status === "open"
+                              ? "bg-emerald-600/90 text-white"
+                              : regStatus.status === "upcoming"
+                              ? "bg-amber-600/90 text-white"
+                              : "bg-gray-800/80 text-white"
+                          }`}
+                        >
+                          {regStatus.status === "open" && <span className="w-1.5 h-1.5 rounded-full bg-white mr-1.5 animate-pulse" />}
+                          {regStatus.labelBn}
+                        </span>
+                      </div>
                     </Link>
                   ) : null}
 
                   <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
                         {!comp.imageUrl && (
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-[#29479B]/10 text-[#29479B] border border-[#29479B]/20">
                             <Tag className="w-3 h-3 mr-1" />
@@ -129,19 +148,23 @@ export function ViewCompetitions() {
 
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                            isActive
+                            regStatus.status === "open"
                               ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                              : isArchived
-                              ? "bg-gray-100 text-gray-700"
-                              : "bg-amber-100 text-amber-800"
+                              : regStatus.status === "upcoming"
+                              ? "bg-amber-100 text-amber-800 border border-amber-200"
+                              : "bg-gray-100 text-gray-700 border border-gray-200"
                           }`}
                         >
                           <span
                             className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-                              isActive ? "bg-emerald-500" : "bg-gray-400"
+                              regStatus.status === "open"
+                                ? "bg-emerald-500"
+                                : regStatus.status === "upcoming"
+                                ? "bg-amber-500"
+                                : "bg-gray-400"
                             }`}
                           />
-                          {isActive ? "সক্রিয় / Active" : "সম্পন্ন / Completed"}
+                          {regStatus.labelBn}
                         </span>
                       </div>
 
@@ -156,11 +179,11 @@ export function ViewCompetitions() {
                           "প্রতিযোগিতার বিস্তারিত নিয়মাবলী, ক্যাটাগরি এবং ফলাফল জানতে বিস্তারিত দেখুন।"}
                       </p>
 
-                      {/* Group, media, and date indicator */}
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 pt-1">
+                      {/* Group, media, and date indicators */}
+                      <div className="space-y-1.5 text-xs text-gray-500 pt-1">
                         {(comp.categoryGroups?.length > 1 || comp.categories?.length > 1) && (
-                          <div className="flex items-center gap-1">
-                            <Layers className="w-3.5 h-3.5 text-[#29479B]" />
+                          <div className="flex items-center gap-1 text-purple-700">
+                            <Layers className="w-3.5 h-3.5" />
                             <span>
                               {(comp.categoryGroups || comp.categories).length} টি গ্রুপ
                             </span>
@@ -168,10 +191,24 @@ export function ViewCompetitions() {
                         )}
 
                         {(comp.startDate || comp.endDate) && (
-                          <div className="flex items-center gap-1 text-[11px] text-gray-500">
-                            <Calendar className="w-3 h-3 text-[#F59E0B]" />
+                          <div className="flex items-center gap-1.5 text-[11px] text-gray-600">
+                            <Calendar className="w-3 h-3 text-[#F59E0B] shrink-0" />
                             <span>
-                              {comp.startDate || ""} {comp.endDate ? `— ${comp.endDate}` : ""}
+                              নিবন্ধন: <strong>{comp.startDate || "শুরু"}</strong> — <strong>{comp.endDate || "শেষ"}</strong>
+                            </span>
+                          </div>
+                        )}
+
+                        {comp.resultPublishDate && (
+                          <div className="flex items-center gap-1.5 text-[11px]">
+                            {certStatus.isPublished ? (
+                              <Clock className="w-3 h-3 text-emerald-600 shrink-0" />
+                            ) : (
+                              <Lock className="w-3 h-3 text-amber-600 shrink-0" />
+                            )}
+                            <span className={certStatus.isPublished ? "text-emerald-700 font-semibold" : "text-amber-800"}>
+                              ফলাফল: {comp.resultPublishDate}
+                              {!certStatus.isPublished && " (লকড)"}
                             </span>
                           </div>
                         )}
@@ -191,9 +228,14 @@ export function ViewCompetitions() {
                         {comp.providesCertificate !== false ? (
                           <Link
                             href={`/certificates?competitionId=${comp._id}`}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-[#29479B] text-white hover:bg-[#1A284A] shadow-xs hover:shadow-md transition-all"
+                            className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl transition-all shadow-xs hover:shadow-md ${
+                              certStatus.isPublished
+                                ? "bg-[#29479B] text-white hover:bg-[#1A284A]"
+                                : "bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100"
+                            }`}
                           >
-                            <span>সার্টিফিকেট</span>
+                            {!certStatus.isPublished && <Lock className="w-3 h-3 text-amber-700" />}
+                            <span>{certStatus.isPublished ? "সার্টিফিকেট" : "ফলাফল লকড"}</span>
                             <ArrowRight className="w-3.5 h-3.5" />
                           </Link>
                         ) : null}

@@ -28,6 +28,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import apiClient from "@/lib/api-client";
 import { toast } from "react-toastify";
+import { getRegistrationStatus } from "@/lib/dateUtils";
 
 export function ParticipantRegistrationForm({
   defaultCompetitionId = "",
@@ -81,6 +82,11 @@ export function ParticipantRegistrationForm({
     }
     return competitions.find((c) => c._id === activeCompetitionId) || competitionData || null;
   }, [competitions, competitionData, activeCompetitionId]);
+
+  // Compute registration timeline eligibility (startDate and endDate checks)
+  const regStatus = useMemo(() => {
+    return getRegistrationStatus(currentCompetition);
+  }, [currentCompetition]);
 
   // Derive categories available for selected competition
   const availableCategories = useMemo(() => {
@@ -147,6 +153,11 @@ export function ParticipantRegistrationForm({
     setRateLimitInfo(null);
 
     // Validation
+    if (!regStatus.isOpen) {
+      setErrorMessage(regStatus.message || "এই প্রতিযোগিতার জন্য বর্তমানে নিবন্ধন গ্রহণ করা হচ্ছে না।");
+      toast.error(regStatus.message || "নিবন্ধন গ্রহণ করা হচ্ছে না।");
+      return;
+    }
     if (!activeCompetitionId) {
       setErrorMessage("অনুগ্রহ করে একটি প্রতিযোগিতা নির্বাচন করুন।");
       return;
@@ -375,6 +386,35 @@ export function ParticipantRegistrationForm({
 
       {/* Form Body */}
       <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        {/* Registration Window Status Notice (Start Date & End Date Restrictions) */}
+        {!regStatus.isOpen && (
+          <div
+            className={`p-4 rounded-2xl border flex items-start gap-3 shadow-2xs animate-in fade-in ${
+              regStatus.status === "upcoming"
+                ? "bg-amber-50 border-amber-300/80 text-amber-950"
+                : "bg-rose-50 border-rose-300/80 text-rose-950"
+            }`}
+          >
+            {regStatus.status === "upcoming" ? (
+              <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            )}
+            <div className="text-xs space-y-1">
+              <p className="font-bold text-sm">
+                {regStatus.status === "upcoming"
+                  ? "নিবন্ধন এখনও শুরু হয়নি (Registration Has Not Started)"
+                  : "নিবন্ধনের সময়সীমা সমাপ্ত হয়েছে (Registration Closed)"}
+              </p>
+              <p className="leading-relaxed opacity-90">
+                {regStatus.status === "upcoming"
+                  ? `এই প্রতিযোগিতার নিবন্ধন শুরু হবে ${currentCompetition?.startDate} তারিখে। নিবন্ধনের শুরুর তারিখের পূর্বে নিবন্ধন করা সম্ভব নয়।`
+                  : `এই প্রতিযোগিতার নিবন্ধনের সময়সীমা ${currentCompetition?.endDate} তারিখে সমাপ্ত হয়েছে। নির্ধারিত সময়সীমার পর নতুন নিবন্ধন গ্রহণ করা হচ্ছে না।`}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Rate Limit Alert */}
         {rateLimitInfo && (
           <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 flex items-start gap-3 animate-in fade-in">
@@ -433,14 +473,27 @@ export function ParticipantRegistrationForm({
             প্রতিযোগিতা নির্বাচন করুন (Competition) <span className="text-red-500">*</span>
           </label>
           {lockCompetition && currentCompetition ? (
-            <div className="p-3 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-between text-xs">
+            <div className="p-3.5 rounded-xl bg-slate-100 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
               <div className="flex items-center gap-2">
-                <Trophy className="w-4 h-4 text-[#29479B]" />
+                <Trophy className="w-4 h-4 text-[#29479B] shrink-0" />
                 <span className="font-bold text-[#1A284A]">{currentCompetition.name}</span>
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-[#29479B]">
-                Selected
-              </span>
+              <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-[#29479B]">
+                  Selected
+                </span>
+                {!regStatus.isOpen && (
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      regStatus.status === "upcoming"
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-rose-100 text-rose-800"
+                    }`}
+                  >
+                    {regStatus.status === "upcoming" ? "শুরু হয়নি" : "নিবন্ধন বন্ধ"}
+                  </span>
+                )}
+              </div>
             </div>
           ) : (
             <Select
@@ -458,11 +511,19 @@ export function ParticipantRegistrationForm({
               ) : competitions.length === 0 ? (
                 <option value="">কোনো সক্রিয় প্রতিযোগিতা নেই</option>
               ) : (
-                competitions.map((c) => (
-                  <option key={c._id} value={c._id} className="text-gray-900 bg-white">
-                    {c.name} {c.refPrefix ? `(${c.refPrefix})` : ""}
-                  </option>
-                ))
+                competitions.map((c) => {
+                  const cStatus = getRegistrationStatus(c);
+                  const statusTag = !cStatus.isOpen
+                    ? cStatus.status === "upcoming"
+                      ? ` [শুরু হয়নি: ${c.startDate}]`
+                      : ` [নিবন্ধন শেষ: ${c.endDate}]`
+                    : "";
+                  return (
+                    <option key={c._id} value={c._id} className="text-gray-900 bg-white">
+                      {c.name} {c.refPrefix ? `(${c.refPrefix})` : ""}{statusTag}
+                    </option>
+                  );
+                })
               )}
             </Select>
           )}
@@ -587,14 +648,30 @@ export function ParticipantRegistrationForm({
           <Button
             type="submit"
             variant="primary"
-            disabled={isSubmitting}
-            className="w-full text-xs sm:text-sm py-3 font-extrabold shadow-md hover:shadow-lg transition-all"
+            disabled={isSubmitting || !regStatus.isOpen}
+            className={`w-full text-xs sm:text-sm py-3 font-extrabold shadow-md transition-all ${
+              !regStatus.isOpen
+                ? "bg-gray-300 hover:bg-gray-300 text-gray-600 cursor-not-allowed border border-gray-400/30"
+                : "hover:shadow-lg"
+            }`}
           >
             {isSubmitting ? (
               <>
                 <Spinner size="sm" className="mr-2 text-white" />
                 <span>জমা হচ্ছে... (Submitting)</span>
               </>
+            ) : !regStatus.isOpen ? (
+              regStatus.status === "upcoming" ? (
+                <>
+                  <Clock className="w-4 h-4 mr-2 text-amber-700" />
+                  <span>নিবন্ধন শুরু হবে: {currentCompetition?.startDate}</span>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="w-4 h-4 mr-2 text-rose-700" />
+                  <span>নিবন্ধনের সময়সীমা শেষ (Registration Closed)</span>
+                </>
+              )
             ) : (
               <>
                 <Sparkles className="w-4 h-4 mr-2 text-[#F59E0B]" />
@@ -603,7 +680,9 @@ export function ParticipantRegistrationForm({
             )}
           </Button>
           <p className="text-[11px] text-gray-400 text-center mt-2">
-            সাবমিট করার সাথে সাথেই আপনি একটি অনন্য রেফারেন্স কোড পাবেন।
+            {!regStatus.isOpen
+              ? regStatus.message
+              : "সাবমিট করার সাথে সাথেই আপনি একটি অনন্য রেফারেন্স কোড পাবেন।"}
           </p>
         </div>
       </form>
