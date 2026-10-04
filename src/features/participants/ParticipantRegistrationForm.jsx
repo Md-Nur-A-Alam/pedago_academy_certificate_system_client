@@ -30,6 +30,126 @@ import apiClient from "@/lib/api-client";
 import { toast } from "react-toastify";
 import { getRegistrationStatus } from "@/lib/dateUtils";
 
+/**
+ * Validates Bangladeshi mobile phone numbers
+ * Accepts formats: 017xxxxxxxx, +88017xxxxxxxx, 88017xxxxxxxx (with optional spaces or dashes)
+ */
+export function validateBDPhoneNumber(phoneNumber) {
+  if (!phoneNumber || typeof phoneNumber !== "string") return false;
+
+  // Convert Bengali numerals to English digits if entered
+  const bengaliDigits = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
+  const normalized = phoneNumber.replace(/[০-৯]/g, (d) => bengaliDigits.indexOf(d));
+
+  // Regex explanation:
+  // ^(\+8801|8801|01)[3-8]{1}[0-9]{8}$
+  // - Optional +880 or 880 followed by 1, or just 01
+  // - Followed by a digit from 3 to 8 (covering all major operators like Grameenphone, Robi, Banglalink, Airtel, Teletalk, Skitto)
+  // - Followed by exactly 8 digits
+  const bdPhoneRegex = /^(\+8801|8801|01)[3-8]{1}[0-9]{8}$/;
+
+  // Remove any spaces or hyphens if the user entered them
+  const cleanedNumber = normalized.trim().replace(/[\s-]/g, "");
+
+  // Also support 019 (Banglalink's primary prefix) in addition to [3-8] to cover all Bangladeshi operators
+  const bdPhoneWithAllOperatorsRegex = /^(\+8801|8801|01)[3-9]{1}[0-9]{8}$/;
+
+  return bdPhoneWithAllOperatorsRegex.test(cleanedNumber);
+}
+
+/**
+ * Validates that a URL is a valid Facebook post, video, reel, photo or watch link
+ */
+export function validateFacebookPostUrl(url) {
+  if (!url || typeof url !== "string") return false;
+
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+
+  // Ensure protocol for proper URL parsing
+  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+  try {
+    const parsed = new URL(withProtocol);
+    const hostname = parsed.hostname.toLowerCase();
+
+    // Check valid Facebook domains
+    const isFacebookDomain =
+      hostname === "facebook.com" ||
+      hostname.endsWith(".facebook.com") ||
+      hostname === "fb.watch" ||
+      hostname.endsWith(".fb.watch") ||
+      hostname === "fb.com" ||
+      hostname.endsWith(".fb.com");
+
+    if (!isFacebookDomain) {
+      return false;
+    }
+
+    const pathname = parsed.pathname.replace(/\/+$/, "");
+    const search = parsed.search;
+
+    // Reject bare homepages
+    if (!pathname && !search) {
+      return false;
+    }
+
+    // Short links: fb.watch/<id>
+    if (hostname === "fb.watch" || hostname.endsWith(".fb.watch")) {
+      return pathname.length > 1;
+    }
+
+    // Specific post/media indicators
+    const isPostPath =
+      /\/posts\/|\/permalink|\/story\.php|\/watch|\/reel\/|\/videos?\/|\/photos?\/|\/photo\.php|\/share\//i.test(
+        pathname
+      );
+
+    if (isPostPath) {
+      return true;
+    }
+
+    // Search query parameters indicating specific post/video content
+    if (/[?&](story_fbid|fbid|v)=/i.test(search)) {
+      return true;
+    }
+
+    // Group posts or permalinks
+    if (/^\/groups\/[^/]+\/(posts|permalink|videos)/i.test(pathname)) {
+      return true;
+    }
+
+    // Generic post path under profile/page (e.g. /username/posts/..., or /username/123456789)
+    const segments = pathname.split("/").filter(Boolean);
+    const nonPostFirstSegments = [
+      "home",
+      "login",
+      "help",
+      "settings",
+      "messages",
+      "notifications",
+      "policies",
+      "privacy",
+      "terms",
+      "marketplace",
+      "gaming",
+      "pages",
+      "events",
+    ];
+
+    if (
+      segments.length >= 2 &&
+      !nonPostFirstSegments.includes(segments[0].toLowerCase())
+    ) {
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export function ParticipantRegistrationForm({
   defaultCompetitionId = "",
   lockCompetition = false,
@@ -61,6 +181,7 @@ export function ParticipantRegistrationForm({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
   const [duplicateInfo, setDuplicateInfo] = useState(null);
   const [rateLimitInfo, setRateLimitInfo] = useState(null);
   const [registeredData, setRegisteredData] = useState(null);
@@ -121,9 +242,14 @@ export function ParticipantRegistrationForm({
       ? category
       : availableCategories[0] || "General";
 
-  const clearErrors = () => {
+  const clearErrors = (field) => {
     if (errorMessage) setErrorMessage("");
     if (duplicateInfo) setDuplicateInfo(null);
+    if (field) {
+      setFieldErrors((prev) => ({ ...prev, [field]: "" }));
+    } else {
+      setFieldErrors({});
+    }
   };
 
   const handleCopyRef = (ref) => {
@@ -142,6 +268,7 @@ export function ParticipantRegistrationForm({
     setSourceUrl("");
     setMediaUrl("");
     setErrorMessage("");
+    setFieldErrors({});
     setDuplicateInfo(null);
     setRateLimitInfo(null);
   };
@@ -149,6 +276,7 @@ export function ParticipantRegistrationForm({
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage("");
+    setFieldErrors({});
     setDuplicateInfo(null);
     setRateLimitInfo(null);
 
@@ -168,32 +296,63 @@ export function ParticipantRegistrationForm({
     }
     if (!name.trim()) {
       setErrorMessage("অনুগ্রহ করে অংশগ্রহণকারীর পূর্ণ নাম লিখুন।");
+      setFieldErrors({ name: "অনুগ্রহ করে অংশগ্রহণকারীর পূর্ণ নাম লিখুন।" });
       return;
     }
     if (!phone.trim()) {
-      setErrorMessage("অনুগ্রহ করে একটি সচল ফোন নম্বর দিন।");
+      const err = "অনুগ্রহ করে একটি সচল ফোন নম্বর দিন।";
+      setErrorMessage(err);
+      setFieldErrors({ phone: err });
+      return;
+    }
+    if (!validateBDPhoneNumber(phone)) {
+      const err = "অনুগ্রহ করে একটি সঠিক বাংলাদেশী মোবাইল নম্বর দিন (যেমন: 01700-000000 বা +8801700000000)।";
+      setErrorMessage(err);
+      setFieldErrors({ phone: err });
+      toast.error("সঠিক বাংলাদেশী মোবাইল নম্বর দিন (যেমন: 017xxxxxxxx)");
       return;
     }
     const parsedAge = parseInt(age, 10);
     if (!parsedAge || parsedAge < 1 || parsedAge > 120) {
-      setErrorMessage("অনুগ্রহ করে সঠিক বয়স লিখুন (১-১২০)।");
+      const err = "অনুগ্রহ করে সঠিক বয়স লিখুন (১-১২০)।";
+      setErrorMessage(err);
+      setFieldErrors({ age: err });
       return;
     }
     if (!sourceUrl.trim()) {
-      setErrorMessage("অনুগ্রহ করে ফেসবুক পোস্ট বা ভিডিওর লিঙ্ক দিন।");
+      const err = "অনুগ্রহ করে ফেসবুক পোস্ট বা ভিডিওর লিঙ্ক দিন।";
+      setErrorMessage(err);
+      setFieldErrors({ sourceUrl: err });
+      return;
+    }
+    if (!validateFacebookPostUrl(sourceUrl)) {
+      const err = "অনুগ্রহ করে একটি সঠিক ফেসবুক পোস্ট, রিল বা ভিডিওর লিঙ্ক দিন (যেমন: https://www.facebook.com/... বা https://fb.watch/...)।";
+      setErrorMessage(err);
+      setFieldErrors({ sourceUrl: err });
+      toast.error("সঠিক ফেসবুক পোস্ট বা ভিডিওর লিঙ্ক দিন।");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
+      // Normalize Bengali digits and strip spacing/hyphens for phone
+      const bengaliDigits = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
+      const cleanedPhone = phone.replace(/[০-৯]/g, (d) => bengaliDigits.indexOf(d)).trim().replace(/[\s-]/g, "");
+
+      // Ensure proper protocol on sourceUrl
+      const cleanedSourceUrl = sourceUrl.trim();
+      const formattedSourceUrl = /^https?:\/\//i.test(cleanedSourceUrl)
+        ? cleanedSourceUrl
+        : `https://${cleanedSourceUrl}`;
+
       const payload = {
         competitionId: activeCompetitionId,
         category: activeCategory.trim(),
         name: name.trim(),
-        phone: phone.trim(),
+        phone: cleanedPhone,
         age: parsedAge,
-        sourceUrl: sourceUrl.trim(),
+        sourceUrl: formattedSourceUrl,
         mediaUrl: mediaUrl.trim(),
       };
 
@@ -562,9 +721,10 @@ export function ParticipantRegistrationForm({
               label="অংশগ্রহণকারীর পূর্ণ নাম (Full Name) *"
               placeholder="e.g. তানভীর আহমেদ / Tanvir Ahmed"
               value={name}
+              error={fieldErrors.name}
               onChange={(e) => {
                 setName(e.target.value);
-                clearErrors();
+                clearErrors("name");
               }}
               required
             />
@@ -572,12 +732,14 @@ export function ParticipantRegistrationForm({
           <div>
             <Input
               label="ফোন নম্বর (Phone Number) *"
-              placeholder="e.g. 01700-000000"
+              placeholder="e.g. 01700-000000 বা +8801700000000"
               value={phone}
+              error={fieldErrors.phone}
               onChange={(e) => {
                 setPhone(e.target.value);
-                clearErrors();
+                clearErrors("phone");
               }}
+              helperText="বাংলাদেশী মোবাইল নম্বর (013-019 বা +8801...)"
               required
             />
           </div>
@@ -593,9 +755,10 @@ export function ParticipantRegistrationForm({
               max="120"
               placeholder="e.g. 10"
               value={age}
+              error={fieldErrors.age}
               onChange={(e) => {
                 setAge(e.target.value);
-                clearErrors();
+                clearErrors("age");
               }}
               required
             />
@@ -620,12 +783,14 @@ export function ParticipantRegistrationForm({
         <div>
           <Input
             label="ফেসবুক পোস্ট বা ভিডিও লিংক (Source URL) *"
-            placeholder="https://www.facebook.com/..."
+            placeholder="https://www.facebook.com/... বা https://fb.watch/..."
             value={sourceUrl}
+            error={fieldErrors.sourceUrl}
             onChange={(e) => {
               setSourceUrl(e.target.value);
-              clearErrors();
+              clearErrors("sourceUrl");
             }}
+            helperText="আপনার সাবমিশনকৃত ফেসবুক পোস্ট, রিল বা ভিডিওর সম্পূর্ণ লিঙ্ক দিন।"
             required
           />
           <p className="text-[10px] text-gray-500 mt-1">

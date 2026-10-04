@@ -25,6 +25,10 @@ import { ImageUpload } from "@/components/ui/ImageUpload";
 import apiClient from "@/lib/api-client";
 import { toast } from "react-toastify";
 import { getRegistrationStatus } from "@/lib/dateUtils";
+import {
+  validateBDPhoneNumber,
+  validateFacebookPostUrl,
+} from "./ParticipantRegistrationForm";
 
 export function PublicRegistrationModal({
   isOpen,
@@ -143,6 +147,11 @@ export function PublicRegistrationModal({
       setErrorMessage("Please enter your phone number.");
       return;
     }
+    if (!validateBDPhoneNumber(phone)) {
+      setErrorMessage("Please enter a valid Bangladeshi mobile number (e.g. 017xxxxxxxx or +8801xxxxxxxxx).");
+      toast.error("সঠিক বাংলাদেশী মোবাইল নম্বর দিন (যেমন: 017xxxxxxxx)");
+      return;
+    }
     const parsedAge = parseInt(age, 10);
     if (!parsedAge || parsedAge < 1 || parsedAge > 120) {
       setErrorMessage("Please enter a valid age.");
@@ -152,17 +161,28 @@ export function PublicRegistrationModal({
       setErrorMessage("Please enter the Facebook post or video source link of your entry.");
       return;
     }
+    if (!validateFacebookPostUrl(sourceUrl)) {
+      setErrorMessage("Please enter a valid Facebook post, reel, or video link (e.g. https://www.facebook.com/... or https://fb.watch/...).");
+      toast.error("সঠিক ফেসবুক পোস্ট বা ভিডিওর লিঙ্ক দিন।");
+      return;
+    }
 
     setIsSubmitting(true);
 
     try {
+      const bengaliDigits = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
+      const cleanedPhone = phone.replace(/[০-৯]/g, (d) => bengaliDigits.indexOf(d)).trim().replace(/[\s-]/g, "");
+      const formattedSourceUrl = /^https?:\/\//i.test(sourceUrl.trim())
+        ? sourceUrl.trim()
+        : `https://${sourceUrl.trim()}`;
+
       const payload = {
         competitionId: activeCompetitionId,
         category: activeCategory.trim(),
         name: name.trim(),
-        phone: phone.trim(),
+        phone: cleanedPhone,
         age: parsedAge,
-        sourceUrl: sourceUrl.trim(),
+        sourceUrl: formattedSourceUrl,
         mediaUrl: mediaUrl.trim(),
       };
 
