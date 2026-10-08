@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Edit, Trash2, Plus, Search, ExternalLink, Calendar, Lock } from "lucide-react";
+import { toast } from "react-toastify";
+import apiClient from "@/lib/api-client";
 import { useCompetitions } from "./useCompetitions";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -11,14 +13,22 @@ import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Modal } from "@/components/ui/Modal";
+import { ExportDropdown } from "@/components/ui/ExportDropdown";
 import { CompetitionForm } from "./CompetitionForm";
 import { getRegistrationStatus, getCertificateReleaseStatus } from "@/lib/dateUtils";
+import {
+  exportToExcel,
+  exportToCsv,
+  exportToJson,
+  formatCompetitionsForExport,
+} from "@/lib/exportUtils";
 
 export function CompetitionsTable() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCompetition, setSelectedCompetition] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const {
     competitions,
@@ -55,6 +65,50 @@ export function CompetitionsTable() {
     }
   };
 
+  const handleExport = async (format) => {
+    setIsExporting(true);
+    try {
+      // Query server for all records matching active filter
+      let dataToExport = competitions;
+      try {
+        const res = await apiClient.get("/api/competitions", {
+          params: { search, status: statusFilter, all: "true" },
+        });
+        if (res.data?.data && Array.isArray(res.data.data)) {
+          dataToExport = res.data.data;
+        }
+      } catch (err) {
+        console.warn("Could not fetch full export list from API, falling back to loaded competitions", err);
+      }
+
+      if (!dataToExport || dataToExport.length === 0) {
+        toast.info("No competitions found matching current filters to export.");
+        return;
+      }
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const statusSlug = statusFilter ? `_${statusFilter}` : "";
+      const baseFilename = `competitions${statusSlug}_${dateStr}`;
+      const formattedRows = formatCompetitionsForExport(dataToExport);
+
+      if (format === "excel") {
+        exportToExcel(formattedRows, baseFilename, "Competitions");
+        toast.success(`Exported ${dataToExport.length} competitions as Excel (.xlsx)`);
+      } else if (format === "csv") {
+        exportToCsv(formattedRows, baseFilename);
+        toast.success(`Exported ${dataToExport.length} competitions as CSV (.csv)`);
+      } else if (format === "json") {
+        exportToJson(dataToExport, baseFilename);
+        toast.success(`Exported ${dataToExport.length} competitions as JSON (.json)`);
+      }
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error(error.message || "Failed to export competitions");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const statusBadgeVariant = {
     active: "success",
     draft: "warning",
@@ -68,9 +122,17 @@ export function CompetitionsTable() {
           <h1 className="text-2xl font-extrabold text-[#1A284A]">Competitions</h1>
           <p className="text-sm text-gray-500 mt-1">Manage competitions, prefixes, and padding</p>
         </div>
-        <Button onClick={handleOpenCreate} variant="primary" className="gap-2">
-          <Plus className="w-4 h-4" /> New Competition
-        </Button>
+        <div className="flex items-center gap-3">
+          <ExportDropdown
+            onExport={handleExport}
+            isLoading={isExporting}
+            count={competitions?.length}
+            disabled={isLoading || competitions?.length === 0}
+          />
+          <Button onClick={handleOpenCreate} variant="primary" className="gap-2">
+            <Plus className="w-4 h-4" /> New Competition
+          </Button>
+        </div>
       </div>
 
       <div className="bg-white p-4 rounded-xl border border-gray-100 flex flex-col sm:flex-row gap-4">

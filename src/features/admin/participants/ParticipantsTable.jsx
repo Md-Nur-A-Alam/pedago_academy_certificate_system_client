@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Plus, Edit, Trash2, Search, FileSpreadsheet, ExternalLink, Image as ImageIcon, Eye } from "lucide-react";
+import { toast } from "react-toastify";
+import apiClient from "@/lib/api-client";
 import { useParticipants } from "./useParticipants";
 import { useCompetitions } from "../competitions/useCompetitions";
 import { Badge } from "@/components/ui/Badge";
@@ -11,9 +13,16 @@ import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Modal } from "@/components/ui/Modal";
+import { ExportDropdown } from "@/components/ui/ExportDropdown";
 import { ParticipantForm } from "./ParticipantForm";
 import { BulkImportModal } from "./BulkImportModal";
 import { ParticipantDetailsModal } from "./ParticipantDetailsModal";
+import {
+  exportToExcel,
+  exportToCsv,
+  exportToJson,
+  formatParticipantsForExport,
+} from "@/lib/exportUtils";
 
 export function ParticipantsTable() {
   const [search, setSearch] = useState("");
@@ -23,6 +32,7 @@ export function ParticipantsTable() {
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [editingParticipant, setEditingParticipant] = useState(null);
   const [viewingParticipant, setViewingParticipant] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const { competitions } = useCompetitions();
   const {
@@ -66,6 +76,58 @@ export function ParticipantsTable() {
     }
   };
 
+  const handleExport = async (format) => {
+    setIsExporting(true);
+    try {
+      let dataToExport = participants;
+      try {
+        const res = await apiClient.get("/api/participants", {
+          params: {
+            search,
+            competitionId: selectedCompetition,
+            achievementType: achievementFilter,
+            all: "true",
+          },
+        });
+        if (res.data?.data && Array.isArray(res.data.data)) {
+          dataToExport = res.data.data;
+        }
+      } catch (err) {
+        console.warn("Could not fetch full export list from API, falling back to loaded participants", err);
+      }
+
+      if (!dataToExport || dataToExport.length === 0) {
+        toast.info("No participants found matching current filters to export.");
+        return;
+      }
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const selectedCompObj = competitions.find((c) => c._id === selectedCompetition);
+      const compSlug = selectedCompObj
+        ? `_${(selectedCompObj.refPrefix || selectedCompObj.name.slice(0, 15)).replace(/[^a-zA-Z0-9_-]/g, "_")}`
+        : "";
+      const achieveSlug = achievementFilter ? `_${achievementFilter}` : "";
+      const baseFilename = `participants${compSlug}${achieveSlug}_${dateStr}`;
+      const formattedRows = formatParticipantsForExport(dataToExport);
+
+      if (format === "excel") {
+        exportToExcel(formattedRows, baseFilename, "Participants");
+        toast.success(`Exported ${dataToExport.length} participants as Excel (.xlsx)`);
+      } else if (format === "csv") {
+        exportToCsv(formattedRows, baseFilename);
+        toast.success(`Exported ${dataToExport.length} participants as CSV (.csv)`);
+      } else if (format === "json") {
+        exportToJson(dataToExport, baseFilename);
+        toast.success(`Exported ${dataToExport.length} participants as JSON (.json)`);
+      }
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error(error.message || "Failed to export participants");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const competitionOptions = [
     { label: "All Competitions", value: "" },
     ...competitions.map((c) => ({ label: c.name, value: c._id })),
@@ -79,6 +141,12 @@ export function ParticipantsTable() {
           <p className="text-sm text-gray-500 mt-1">Manage competition participants and reference numbers</p>
         </div>
         <div className="flex items-center gap-3">
+          <ExportDropdown
+            onExport={handleExport}
+            isLoading={isExporting}
+            count={participants?.length}
+            disabled={isLoading || participants?.length === 0}
+          />
           <Button
             onClick={() => setIsBulkModalOpen(true)}
             variant="outline"
