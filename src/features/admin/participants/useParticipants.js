@@ -87,8 +87,15 @@ export function useParticipants(params = {}) {
 
   return {
     participants: participantsQuery.data?.data || [],
-    pagination: participantsQuery.data?.pagination || {},
+    pagination: participantsQuery.data?.pagination || {
+      total: 0,
+      page: 1,
+      limit: 10,
+      totalPages: 1,
+    },
+    availableCategories: participantsQuery.data?.availableCategories || [],
     isLoading: participantsQuery.isLoading,
+    isFetching: participantsQuery.isFetching,
     isError: participantsQuery.isError,
     error: participantsQuery.error,
     createParticipant: createMutation.mutateAsync,
